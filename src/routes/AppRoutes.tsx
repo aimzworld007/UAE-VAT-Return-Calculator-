@@ -17,6 +17,12 @@ const mapStep = { 'business-details': 1, input: 2, preview: 3, export: 4 } as co
 const mapTaxStep = { 'business-details': 1, input: 3, preview: 5, export: 6 } as const;
 
 const fetchJson = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
+const toIsoOrNull = (value?: string) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   const { navigate, pathname } = usePathname();
@@ -59,8 +65,8 @@ function RoutedModules() { const { pathname, navigate } = usePathname(); const {
       const result = calculateVat(vat);
       await createTaxRecord({
         taxType: 'VAT',
-        periodStart: vat.taxPeriodStart ? new Date(vat.taxPeriodStart).toISOString() : null,
-        periodEnd: vat.taxPeriodEnd ? new Date(vat.taxPeriodEnd).toISOString() : null,
+        periodStart: toIsoOrNull(vat.taxPeriodStart),
+        periodEnd: toIsoOrNull(vat.taxPeriodEnd),
         inputPayload: vat,
         resultPayload: result,
       });
@@ -74,8 +80,8 @@ function RoutedModules() { const { pathname, navigate } = usePathname(); const {
       const result = calculateCorporateTax(ct);
       await createTaxRecord({
         taxType: 'CORPORATE',
-        periodStart: ct.financialYearStart ? new Date(ct.financialYearStart).toISOString() : null,
-        periodEnd: ct.financialYearEnd ? new Date(ct.financialYearEnd).toISOString() : null,
+        periodStart: toIsoOrNull(ct.financialYearStart),
+        periodEnd: toIsoOrNull(ct.financialYearEnd),
         inputPayload: ct,
         resultPayload: result,
       });

@@ -1,7 +1,10 @@
 import React from 'react';
-import { Alert, Box, Button, Card, CardContent, Grid, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { useAuth } from '../../modules/auth/AuthContext';
+import { AccountInfoCard } from './components/AccountInfoCard';
+import { ProfileForm } from './components/ProfileForm';
+import { PasswordChangeForm } from './components/PasswordChangeForm';
 
 export function ProfileSettingsPage() {
   const { user, refreshUser, updateProfile, changePassword, loading } = useAuth();
@@ -45,13 +48,13 @@ export function ProfileSettingsPage() {
     {notice && <Alert severity={notice.type}>{notice.text}</Alert>}
     <Grid container spacing={2.2}>
       <Grid item xs={12} md={4}>
-        <Card variant='outlined'><CardContent><Stack spacing={1}><Typography variant='h6'>Account Info</Typography><Typography><b>Email:</b> {user?.email || '-'}</Typography><Typography><b>Role:</b> {user?.role || '-'}</Typography><Typography><b>Status:</b> {user?.isActive ? 'Active' : 'Disabled'}</Typography></Stack></CardContent></Card>
+        <AccountInfoCard user={user} />
       </Grid>
       <Grid item xs={12} md={8}>
-        <Card variant='outlined'><CardContent><Stack component='form' onSubmit={onSaveProfile} spacing={1.4}><Typography variant='h6'>Profile Details</Typography><TextField label='Full Name' required value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} /><TextField label='Phone' value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /><TextField label='Address' multiline minRows={3} value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} /><Button type='submit' variant='contained' disabled={loading}>Save Profile</Button></Stack></CardContent></Card>
+        <ProfileForm profile={profile} setProfile={setProfile} onSubmit={onSaveProfile} loading={loading} />
       </Grid>
       <Grid item xs={12}>
-        <Card variant='outlined'><CardContent><Stack component='form' onSubmit={onChangePassword} spacing={1.4}><Typography variant='h6'>Security: Change Password</Typography><TextField label='Current Password' type='password' required value={password.currentPassword} onChange={(e) => setPassword({ ...password, currentPassword: e.target.value })} /><TextField label='New Password' type='password' required helperText='Minimum 8 characters' value={password.newPassword} onChange={(e) => setPassword({ ...password, newPassword: e.target.value })} /><TextField label='Confirm New Password' type='password' required value={password.confirmPassword} onChange={(e) => setPassword({ ...password, confirmPassword: e.target.value })} /><Button type='submit' variant='contained' disabled={loading}>Change Password</Button></Stack></CardContent></Card>
+        <PasswordChangeForm password={password} setPassword={setPassword} onSubmit={onChangePassword} loading={loading} />
       </Grid>
     </Grid>
   </Stack></DashboardLayout>;
