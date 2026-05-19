@@ -59,6 +59,16 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.jsx" onerror="window.__appLoadFailed && window.__appLoadFailed()"></script>
+    <script>
+      window.__appLoadFailed = () => {
+        const root = document.getElementById('root');
+        if (!root) return;
+        root.innerHTML = `<div style="max-width:640px;margin:40px auto;padding:20px;border:1px solid #f3d7d7;border-radius:12px;background:#fff5f5;color:#7a1c1c;font-family:Arial,sans-serif;line-height:1.5">
+          <h1 style="margin-top:0;font-size:20px">App failed to load</h1>
+          <p style="margin-bottom:0">The frontend bundle could not be loaded. Please deploy the production build output (the <code>dist/</code> folder) or run the Vite build step before serving this site.</p>
+        </div>`;
+      };
+    </script>
   </body>
 </html>
