@@ -1,10 +1,10 @@
 import { verifyAccessToken } from '../lib/authTokens.js';
 
 function readToken(req) {
+  if (req.cookies?.accessToken) return req.cookies.accessToken;
   const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
   if (scheme === 'Bearer' && token) return token;
-  if (req.cookies?.accessToken) return req.cookies.accessToken;
   return null;
 }
 

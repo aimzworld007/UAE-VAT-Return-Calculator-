@@ -35,7 +35,11 @@ export function DashboardPage() {
         setData(dashboardData || null);
         setError('');
       })
-      .catch(() => {
+      .catch((error: any) => {
+        if (error?.status === 401) {
+          setError('Your session has expired. Please sign in again to load dashboard details.');
+          return;
+        }
         setError('Unable to load dashboard details right now.');
       })
       .finally(() => setLoading(false));
