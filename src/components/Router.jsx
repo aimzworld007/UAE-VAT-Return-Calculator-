@@ -1,19 +1,19 @@
 import React from 'react';
 
-export function usePathname() {
-  const normalizePathname = React.useCallback((value) => {
-    if (!value) return '/';
-    const trimmed = value.replace(/\/+$/, '');
-    return trimmed || '/';
-  }, []);
+function normalizePathname(value) {
+  if (!value) return '/';
+  const trimmed = value.replace(/\/+$/, '');
+  return trimmed || '/';
+}
 
+export function usePathname() {
   const [pathname, setPathname] = React.useState(() => normalizePathname(window.location.pathname));
 
   React.useEffect(() => {
     const onPopState = () => setPathname(normalizePathname(window.location.pathname));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [normalizePathname]);
+  }, []);
 
   const navigate = React.useCallback((to) => {
     const target = new URL(to, window.location.origin);
@@ -22,7 +22,7 @@ export function usePathname() {
     if (currentPath === targetPath && window.location.search === target.search) return;
     window.history.pushState({}, '', `${targetPath}${target.search}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
-  }, [normalizePathname]);
+  }, []);
 
   return { pathname, navigate };
 }
