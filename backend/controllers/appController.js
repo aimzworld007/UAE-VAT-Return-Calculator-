@@ -148,3 +148,5 @@ export const adminUserStatus = async (_req,res)=>ok(res,null);
 export const adminRecords = async (_req,res)=>ok(res,{vat:[],tax:[]});
 export const getSmtp = async (_req,res)=>ok(res,null);
 export const putSmtp = async (_req,res)=>ok(res,null);
+
+export const adminAuditLogs = async (_req,res)=>ok(res,[]);
