@@ -16,7 +16,9 @@ import businessProfileRoutes from './routes/businessProfileRoutes.js';
 import vatRecordRoutes from './routes/vatRecordRoutes.js';
 import corporateTaxRecordRoutes from './routes/corporateTaxRecordRoutes.js';
 import reminderRoutes from './routes/reminderRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { ensureSchema } from './db/ensureSchema.js';
+import { requireAuth, requireSuperadmin } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,11 +46,17 @@ export function createApp() {
   app.use('/api/vat-records', vatRecordRoutes);
   app.use('/api/corporate-tax-records', corporateTaxRecordRoutes);
   app.use('/api/reminders', reminderRoutes);
+  app.use('/api/admin', requireAuth, requireSuperadmin, adminRoutes);
   app.use('/api', vatPdfRoutes);
   app.use('/api', appRoutes);
 
   app.get('/api/health', (_, res) => {
     res.json({ status: 'ok' });
+  });
+
+
+  app.use('/api/*', (_req, res) => {
+    return res.status(404).json({ success: false, code: 'API_NOT_FOUND', message: 'API route not found' });
   });
 
   const distDir = path.resolve(__dirname, '../dist');
