@@ -24,17 +24,19 @@ const toIsoOrNull = (value?: string) => {
 };
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { navigate, pathname } = usePathname();
   React.useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       const next = encodeURIComponent(pathname);
       navigate(`/login?next=${next}`);
     }
-  }, [user, pathname]);
+  }, [loading, user, pathname, navigate]);
+
+  if (loading) return <LinearProgress />;
   return user ? <>{children}</> : null;
 };
-const GuestRoute = ({ children }: { children: React.ReactNode }) => { const { user } = useAuth(); const { navigate } = usePathname(); React.useEffect(() => { if (user) navigate('/dashboard'); }, [user]); return user ? null : <>{children}</>; };
+const GuestRoute = ({ children }: { children: React.ReactNode }) => { const { user, loading } = useAuth(); const { navigate } = usePathname(); React.useEffect(() => { if (!loading && user) navigate('/dashboard'); }, [loading, user, navigate]); if (loading) return <LinearProgress />; return user ? null : <>{children}</>; };
 
 function LoginPage() { const { navigate } = usePathname(); const { login, loading } = useAuth(); const [email, setEmail] = React.useState(''); const [password, setPassword] = React.useState(''); const [error, setError] = React.useState('');
   const redirectTo = React.useMemo(() => {

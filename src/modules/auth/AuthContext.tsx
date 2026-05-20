@@ -38,8 +38,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const [user, setUser] = React.useState<AuthUser | null>(() => readStoredUser());
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
 
+
+  React.useEffect(() => {
+    let active = true;
+
+    const bootstrapAuth = async () => {
+      try {
+        const res = await fetch(`${USERS_API}/me`, { method: 'GET', credentials: 'include' });
+        const data = await readResponseBody(res);
+        if (!active) return;
+        if (!res.ok) {
+          persistUser(null);
+          return;
+        }
+
+        const refreshedUser = getUserFromResponse(data);
+        persistUser(refreshedUser);
+      } catch {
+        if (active) persistUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    bootstrapAuth();
+
+    return () => {
+      active = false;
+    };
+  }, []);
   const persistUser = (next: AuthUser | null) => {
     setUser(next);
     try {
