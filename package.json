@@ -7,7 +7,7 @@
     "dev": "node node_modules/vite/bin/vite.js",
     "dev:api": "node backend/server.js",
     "dev:full": "node backend/server.js & node node_modules/vite/bin/vite.js",
-    "build": "vite build",
+    "build": "node node_modules/vite/bin/vite.js build",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "test": "node --test",
     "start": "node server/index.js",
