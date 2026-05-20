@@ -17,9 +17,15 @@ export type DashboardData = {
 };
 
 export async function fetchDashboard(): Promise<DashboardData> {
-  const response = await apiClient<{ data?: DashboardData }>('/api/dashboard');
-  if (!response?.data) {
-    throw new Error('Dashboard data is missing from server response.');
+  const response = await apiClient<DashboardData | { data?: DashboardData }>('/api/dashboard');
+
+  if (response && 'data' in response && response.data) {
+    return response.data;
   }
-  return response.data;
+
+  if (response && !('data' in response)) {
+    return response;
+  }
+
+  throw new Error('Dashboard data is missing from server response.');
 }
