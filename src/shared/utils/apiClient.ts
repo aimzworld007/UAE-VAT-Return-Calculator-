@@ -15,10 +15,8 @@ export function setStoredToken(token: string | null) {
 }
 
 export async function apiClient<T = any>(url: string, init: RequestInit = {}): Promise<T> {
-  const token = getStoredToken();
   const headers = new Headers(init.headers || {});
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
-  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
 
   const response = await fetch(`${getBaseUrl()}${url}`, { credentials: 'include', ...init, headers });
   const contentType = response.headers.get('content-type') || '';
@@ -30,7 +28,11 @@ export async function apiClient<T = any>(url: string, init: RequestInit = {}): P
   }
 
   const json = await response.json();
-  if (!response.ok) throw new Error(json?.message || 'Request failed');
+  if (!response.ok) {
+    const error = new Error(json?.message || 'Request failed');
+    (error as any).status = response.status;
+    throw error;
+  }
   return json;
 }
 
