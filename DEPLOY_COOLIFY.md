@@ -37,11 +37,11 @@ SMTP_FROM=
 1. Attach the domain **`uaevat.live`** to the app service.
 2. Enable SSL (Let's Encrypt) in Coolify.
 
-## 6) Run production Prisma migrations safely
+## 6) Run production SQL migration migrations safely
 After first deploy, run in app/container terminal:
 
 ```bash
-npx prisma migrate deploy
+npm run db:migrate
 ```
 
 > Do **not** run destructive reset/drop commands in production.

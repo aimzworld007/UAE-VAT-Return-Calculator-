@@ -9,7 +9,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     // `node` types are required for serverless files that use Node globals like
-    // `process` and Prisma runtime APIs; `vite/client` keeps frontend typings intact.
+    // `process` and SQL migration runtime APIs; `vite/client` keeps frontend typings intact.
     "types": ["vite/client", "node"],
     "strict": true,
     "noEmit": true,

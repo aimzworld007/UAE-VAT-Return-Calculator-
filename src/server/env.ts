@@ -47,7 +47,7 @@ export const getDatabaseUrl = (): string => {
 
   throw requiredEnvError(
     'DATABASE_URL',
-    'Configure this in your VPS/container environment and local .env files so Prisma can connect during API execution.'
+    'Configure this in your VPS/container environment and local .env files so the PostgreSQL pool can connect during API execution.'
   );
 };
 
