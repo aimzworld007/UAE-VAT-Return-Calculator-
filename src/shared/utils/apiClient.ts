@@ -1,7 +1,7 @@
-const TOKEN_KEY = 'auth_token';
+const TOKEN_KEY = 'fta_tax_auth_token';
 
 function getBaseUrl() {
-  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+  const envBase = (import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_API_BASE_URL;
   return envBase || '';
 }
 
@@ -26,13 +26,21 @@ export async function apiClient<T = any>(url: string, init: RequestInit = {}): P
   const response = await fetch(`${getBaseUrl()}${url}`, { credentials: 'include', ...init, headers });
   const contentType = response.headers.get('content-type') || '';
 
-  if (!contentType.includes('application/json')) {
-    const error = new Error(`API returned non-JSON response (${response.status})`);
+  let json: any = null;
+  if (contentType.includes('application/json')) {
+    json = await response.json();
+  } else {
+    const text = await response.text();
+    json = { message: text || `API returned non-JSON response (${response.status})` };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    setStoredToken(null);
+    const error = new Error('SESSION_EXPIRED');
     (error as any).status = response.status;
     throw error;
   }
 
-  const json = await response.json();
   if (!response.ok) {
     const error = new Error(json?.message || 'Request failed');
     (error as any).status = response.status;

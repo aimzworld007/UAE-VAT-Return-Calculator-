@@ -1,4 +1,5 @@
 import React from 'react';
+import { setStoredToken } from '../../shared/utils/apiClient';
 
 type AuthUser = {
   id: string;
@@ -50,14 +51,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await readResponseBody(res);
         if (!active) return;
         if (!res.ok) {
+          setStoredToken(null);
           persistUser(null);
           return;
         }
 
+        const accessToken = data?.data?.accessToken ?? data?.accessToken;
+        if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
         const refreshedUser = getUserFromResponse(data);
         persistUser(refreshedUser);
       } catch {
-        if (active) persistUser(null);
+        if (active) persistUser(readStoredUser());
       } finally {
         if (active) setLoading(false);
       }
@@ -101,6 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${AUTH_API}/login`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const data = await readResponseBody(res);
       if (!res.ok) return { ok: false, error: getErrorFromResponse(data, 'Login failed') };
+      const accessToken = data?.data?.accessToken ?? data?.accessToken;
+      if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
       const loggedInUser = getUserFromResponse(data);
       if (!loggedInUser) return { ok: false, error: 'Login failed: invalid server response' };
       persistUser(loggedInUser);
@@ -120,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${AUTH_API}/register`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await readResponseBody(res);
       if (!res.ok) return { ok: false, error: getErrorFromResponse(data, 'Registration failed') };
+      const accessToken = data?.data?.accessToken ?? data?.accessToken;
+      if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
       const registeredUser = getUserFromResponse(data);
       if (!registeredUser) return { ok: false, error: 'Registration failed: invalid server response' };
       persistUser(registeredUser);
@@ -134,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [login]);
 
   const logout = React.useCallback(async () => {
+    setStoredToken(null);
     persistUser(null);
     await fetch(`${AUTH_API}/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
   }, []);
@@ -144,7 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch(`${USERS_API}/me`, { method: 'GET', credentials: 'include' });
       const data = await readResponseBody(res);
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) setStoredToken(null);
+        return;
+      }
+      const accessToken = data?.data?.accessToken ?? data?.accessToken;
+      if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
       const refreshedUser = getUserFromResponse(data);
       if (refreshedUser) persistUser(refreshedUser);
     } catch {}
