@@ -28,19 +28,23 @@ export function DashboardPage() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+  const [sessionExpired, setSessionExpired] = React.useState(false);
 
   React.useEffect(() => {
     fetchDashboard()
       .then((dashboardData) => {
         setData(dashboardData || null);
+        setSessionExpired(false);
         setError('');
       })
       .catch((error: any) => {
-        if (error?.status === 401) {
+        if (error?.status === 401 || error?.status === 403) {
+          setSessionExpired(true);
           setError('Your session has expired. Please sign in again to load dashboard details.');
           return;
         }
-        setError('Unable to load dashboard details right now.');
+        setSessionExpired(false);
+        setError('Dashboard data could not be loaded. Please try again.');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -77,7 +81,18 @@ export function DashboardPage() {
         </Card>
 
         {loading && <LoadingState message='Loading dashboard…' />}
-        {!loading && error && <ErrorState message={error} />}
+        {!loading && error && (
+          <Card variant='outlined'>
+            <CardContent>
+              <ErrorState message={error} />
+              {sessionExpired && (
+                <Button component={RouteLink} to='/login' variant='contained' sx={{ mt: 1.5 }}>
+                  Sign In
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, gap: 1.5 }}>
           {kpis.map((kpi: any) => (
