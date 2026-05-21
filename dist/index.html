@@ -3,12 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="UAE VAT Return and Corporate Tax calculator for internal business tax estimation." />
-    <title>UAE Tax Suite</title>
-    <script type="module" crossorigin src="/assets/index-Bu9eL_3a.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DuhNMj92.css">
+    <title>FTA VAT & Tax Filing Assistant | UAE VAT Return & Corporate Tax Calculator</title>
+    <meta name="description" content="UAE VAT Return and Corporate Tax filing assistant for small businesses. Calculate VAT, prepare tax records, review payable or refundable VAT, and generate organized reports." />
+    <meta name="keywords" content="UAE VAT, UAE Corporate Tax, FTA VAT return, VAT calculator UAE, corporate tax calculator UAE" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="theme-color" content="#0f4ab8" />
+    <link rel="canonical" id="canonical-link" href="https://ftapro.vercel.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="FTA VAT & Tax Filing Assistant | UAE VAT Return & Corporate Tax Calculator" />
+    <meta property="og:description" content="UAE VAT Return and Corporate Tax filing assistant for small businesses. Calculate VAT, prepare tax records, review payable or refundable VAT, and generate organized reports." />
+    <meta property="og:url" content="https://ftapro.vercel.app/" />
+    <meta property="og:image" content="/logo.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FTA VAT & Tax Filing Assistant | UAE VAT Return & Corporate Tax Calculator" />
+    <meta name="twitter:description" content="UAE VAT Return and Corporate Tax filing assistant for small businesses. Calculate VAT, prepare tax records, review payable or refundable VAT, and generate organized reports." />
+    <meta name="twitter:image" content="/logo.png" />
+
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "FTA VAT & Tax Filing Assistant",
+        "description": "UAE VAT Return and Corporate Tax filing assistant for small businesses. Calculate VAT, prepare tax records, review payable or refundable VAT, and generate organized reports.",
+        "url": "https://ftapro.vercel.app/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web/PWA"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "FTA VAT & Tax Filing Assistant",
+        "description": "UAE VAT Return and Corporate Tax filing assistant for small businesses. Calculate VAT, prepare tax records, review payable or refundable VAT, and generate organized reports.",
+        "url": "https://ftapro.vercel.app/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web/PWA"
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const canonical = document.getElementById('canonical-link');
+        if (canonical) canonical.href = window.location.origin + window.location.pathname;
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/index-DDZcLl8o.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/DashboardLayout-iv9lfJfm.js">
+    <link rel="modulepreload" crossorigin href="/assets/TextField-CEe2ipuS.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-j1clbJzg.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+    <script>
+      window.__appLoadFailed = () => {
+        const root = document.getElementById('root');
+        if (!root) return;
+        root.innerHTML = `<div style="max-width:640px;margin:40px auto;padding:20px;border:1px solid #f3d7d7;border-radius:12px;background:#fff5f5;color:#7a1c1c;font-family:Arial,sans-serif;line-height:1.5">
+          <h1 style="margin-top:0;font-size:20px">App failed to load</h1>
+          <p style="margin-bottom:0">The frontend bundle could not be loaded. Please deploy the production build output (the <code>dist/</code> folder) or run the Vite build step before serving this site.</p>
+        </div>`;
+      };
+    </script>
   </body>
 </html>
