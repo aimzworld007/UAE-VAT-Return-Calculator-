@@ -32,6 +32,7 @@ export function createApp() {
     cors({
       origin: process.env.FRONTEND_URL?.split(',') || process.env.FRONTEND_ORIGIN?.split(',') || true,
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization'],
     })
   );
   app.use(express.json({ limit: '1mb' }));

@@ -23,7 +23,8 @@ export async function apiClient<T = any>(url: string, init: RequestInit = {}): P
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${getBaseUrl()}${url}`, { credentials: 'include', ...init, headers });
+  const targetUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `${getBaseUrl()}${url}`;
+  const response = await fetch(targetUrl, { credentials: 'include', ...init, headers });
   const contentType = response.headers.get('content-type') || '';
 
   let json: any = null;
@@ -44,6 +45,7 @@ export async function apiClient<T = any>(url: string, init: RequestInit = {}): P
   if (!response.ok) {
     const error = new Error(json?.message || 'Request failed');
     (error as any).status = response.status;
+    (error as any).payload = json;
     throw error;
   }
   return json;
