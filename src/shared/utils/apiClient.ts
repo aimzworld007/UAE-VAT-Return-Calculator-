@@ -18,6 +18,11 @@ export async function apiClient<T = any>(url: string, init: RequestInit = {}): P
   const headers = new Headers(init.headers || {});
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
 
+  const token = getStoredToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${getBaseUrl()}${url}`, { credentials: 'include', ...init, headers });
   const contentType = response.headers.get('content-type') || '';
 
