@@ -262,7 +262,7 @@ function RoutedModules() {
       <Guarded>
         <DashboardLayout>
           <TaxModuleLayout moduleTitle='Corporate Tax Module' basePath='/tax' currentStep={taxParts[1] || 'details'} showModuleHeader={false}>
-            <CorporateTaxWizard data={ct} setData={setCt} onSave={handleSaveTaxRecord} forcedStep={forcedStep} />
+            <CorporateTaxWizard data={ct} setData={setCt} onSave={handleSaveTaxRecord} forcedStep={forcedStep} navigateToStep={(next) => navigate(next)} />
           </TaxModuleLayout>
         </DashboardLayout>
       </Guarded>

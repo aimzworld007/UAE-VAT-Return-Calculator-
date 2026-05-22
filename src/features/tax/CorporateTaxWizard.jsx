@@ -41,9 +41,10 @@ const steps = [
 
 const EMIRATE_OPTIONS = ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Umm Al Quwain', 'Ras Al Khaimah', 'Fujairah'];
 
-export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressChange, forcedStep }) {
+export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressChange, forcedStep, navigateToStep }) {
   const [step, setStep] = React.useState(forcedStep || 1);
   const result = calculateCorporateTax(data);
+  const stepToPath = React.useMemo(() => ({ 1: '/tax/details', 2: '/tax/input', 3: '/tax/preview', 4: '/tax/export' }), []);
 
   React.useEffect(() => {
     onProgressChange?.(step * 25);
@@ -63,8 +64,16 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
   };
 
   const missingRequired = !data.companyName || !data.taxRegistrationNumber || !data.businessActivity;
-  const next = () => setStep((s) => Math.min(4, s + 1));
-  const back = () => setStep((s) => Math.max(1, s - 1));
+  const next = () => {
+    const nextStep = Math.min(4, step + 1);
+    if (navigateToStep) navigateToStep(stepToPath[nextStep]);
+    else setStep(nextStep);
+  };
+  const back = () => {
+    const prevStep = Math.max(1, step - 1);
+    if (navigateToStep) navigateToStep(stepToPath[prevStep]);
+    else setStep(prevStep);
+  };
 
   const NumberField = ({ label, keyName, helperText }) => (
     <Grid size={{ xs: 12, md: 4 }}>
@@ -89,7 +98,7 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
   });
 
   return <div className='vat-wizard vatWizardPage'>
-    <Button className='backHomeButton' onClick={() => window.history.back()} startIcon={<ArrowLeftIcon fontSize='small' />}>
+    <Button className='backHomeButton' onClick={() => (navigateToStep ? navigateToStep('/dashboard') : window.history.back())} startIcon={<ArrowLeftIcon fontSize='small' />}>
       Corporate Tax Module
     </Button>
 
@@ -105,7 +114,7 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
           </Box>
           <Box className='wizardStepper'>
             {stepMeta.map((item, idx) => <React.Fragment key={item.label}>
-              <Button disableRipple onClick={() => setStep(item.stepNumber)} className={`stepCard ${item.status}`}>
+              <Button disableRipple onClick={() => (navigateToStep ? navigateToStep(stepToPath[item.stepNumber]) : setStep(item.stepNumber))} className={`stepCard ${item.status}`}>
                 <Stack spacing={1} alignItems='center'>
                   <Box className='stepIconWrap'>
                     {item.status === 'completed' ? <CheckCircle2 size={28} strokeWidth={2.2} /> : <item.icon size={25} strokeWidth={2.2} />}

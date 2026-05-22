@@ -216,7 +216,7 @@ router.put('/:id', async (req, res) => {
   }
 
   const p = parsed.data;
-  const payload = p.payload || req.body || row.payload || {};
+  const payload = typeof p.payload !== 'undefined' ? p.payload : row.payload || {};
   const netVat = toNumber(payload?.result?.netVat ?? payload?.netVat);
 
   const payableVat = typeof p.payableVat === 'number' ? p.payableVat : netVat > 0 ? netVat : Number(row.payable_vat || 0);

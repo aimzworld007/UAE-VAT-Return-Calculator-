@@ -187,7 +187,7 @@ router.put('/:id', async (req, res) => {
   }
 
   const p = parsed.data;
-  const payload = p.payload || req.body || row.payload || {};
+  const payload = typeof p.payload !== 'undefined' ? p.payload : row.payload || {};
   const resolvedTaxAmount = typeof p.taxAmount === 'number'
     ? p.taxAmount
     : Number.isFinite(Number(payload?.result?.taxPayable ?? payload?.taxPayable))
