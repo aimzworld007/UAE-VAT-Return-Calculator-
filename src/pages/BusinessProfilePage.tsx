@@ -1,0 +1,1 @@
+export { BusinessProfilePage } from '../features/business/BusinessProfilePage';

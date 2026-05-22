@@ -3,22 +3,23 @@ import { apiClient, setStoredToken } from '../../shared/utils/apiClient';
 
 type AuthUser = {
   id: string;
-  email: string;
+  name?: string;
   fullName?: string;
+  email: string;
   phone?: string;
   address?: string;
-  role?: 'USER' | 'SUPERADMIN';
-  isActive?: boolean;
+  role?: 'user' | 'superadmin' | 'USER' | 'SUPERADMIN';
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  register: (payload: { fullName: string; email: string; password: string; confirmPassword: string; phone?: string }) => Promise<{ ok: boolean; error?: string }>;
+  register: (payload: { name?: string; fullName?: string; email: string; password: string; confirmPassword?: string; phone?: string }) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  updateProfile: (next: Pick<AuthUser, 'fullName' | 'phone' | 'address'>) => Promise<{ ok: boolean; error?: string }>;
+  refreshMe: () => Promise<void>;
+  updateProfile: (next: Pick<AuthUser, 'name' | 'fullName' | 'email' | 'phone' | 'address'>) => Promise<{ ok: boolean; error?: string }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
@@ -26,100 +27,128 @@ const AuthContext = React.createContext<AuthContextValue | undefined>(undefined)
 const AUTH_API = '/api/auth';
 const USER_KEY = 'fta_auth_user';
 
+function normalizeUser(input: any): AuthUser | null {
+  if (!input || typeof input !== 'object') return null;
+  return {
+    id: input.id,
+    name: input.name || input.fullName || input.full_name,
+    fullName: input.fullName || input.full_name || input.name,
+    email: input.email,
+    phone: input.phone,
+    address: input.address,
+    role: String(input.role || 'user').toLowerCase() as AuthUser['role'],
+  };
+}
+
+function readUserFromResponse(payload: any): AuthUser | null {
+  return normalizeUser(payload?.user || payload?.data?.user || null);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const readStoredUser = (): AuthUser | null => {
+  const [loading, setLoading] = React.useState(true);
+  const [user, setUser] = React.useState<AuthUser | null>(() => {
     try {
-      const saved = window.localStorage.getItem(USER_KEY);
+      const saved = localStorage.getItem(USER_KEY);
       if (!saved) return null;
-      return JSON.parse(saved);
+      return normalizeUser(JSON.parse(saved));
     } catch {
       return null;
     }
-  };
-
-  const [user, setUser] = React.useState<AuthUser | null>(() => readStoredUser());
-  const [loading, setLoading] = React.useState(true);
+  });
 
   const persistUser = React.useCallback((next: AuthUser | null) => {
     setUser(next);
     try {
-      if (next) window.localStorage.setItem(USER_KEY, JSON.stringify(next));
-      else window.localStorage.removeItem(USER_KEY);
+      if (!next) localStorage.removeItem(USER_KEY);
+      else localStorage.setItem(USER_KEY, JSON.stringify(next));
     } catch {
-      // Ignore storage failures so auth state still works in restricted browsers.
+      // Ignore storage failures.
     }
   }, []);
 
-  const getUserFromResponse = (payload: any): AuthUser | null => {
-    if (!payload || typeof payload !== 'object') return null;
-    return payload.user ?? payload.data?.user ?? null;
-  };
-
-  const getErrorFromResponse = (payload: any, fallback: string) => payload?.message || payload?.error || fallback;
+  const refreshMe = React.useCallback(async () => {
+    try {
+      const response = await apiClient<any>(`${AUTH_API}/me`);
+      const nextUser = readUserFromResponse(response);
+      persistUser(nextUser);
+    } catch (error: any) {
+      if (error?.status === 401 || error?.status === 403) {
+        persistUser(null);
+      }
+      throw error;
+    }
+  }, [persistUser]);
 
   React.useEffect(() => {
     let active = true;
 
-    const bootstrapAuth = async () => {
-      try {
-        const data = await apiClient<any>(`${AUTH_API}/me`, { method: 'GET' });
-        if (!active) return;
-        const refreshedUser = getUserFromResponse(data);
-        persistUser(refreshedUser);
-      } catch (error: any) {
-        if (!active) return;
-        if (error?.status === 401 || error?.status === 403) {
-          persistUser(null);
-          return;
+    refreshMe()
+      .catch(() => {
+        if (active) {
+          // Keep localStorage user on transient failures only when existing token likely valid.
         }
-        // Keep existing session on transient API/network errors.
-        persistUser(readStoredUser());
-      } finally {
+      })
+      .finally(() => {
         if (active) setLoading(false);
-      }
-    };
+      });
 
-    bootstrapAuth();
     return () => {
       active = false;
     };
-  }, [persistUser]);
+  }, [refreshMe]);
 
   const login = React.useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
-      const data = await apiClient<any>(`${AUTH_API}/login`, {
+      const response = await apiClient<any>(`${AUTH_API}/login`, {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      const accessToken = data?.data?.accessToken ?? data?.accessToken;
-      if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
-      const loggedInUser = getUserFromResponse(data);
-      if (!loggedInUser) return { ok: false, error: 'Login failed: invalid server response' };
-      persistUser(loggedInUser);
+
+      const token = response?.data?.token || response?.data?.accessToken || response?.token || response?.accessToken;
+      if (token) setStoredToken(token);
+
+      const nextUser = readUserFromResponse(response);
+      if (!nextUser) return { ok: false, error: 'Login failed: invalid server response' };
+
+      persistUser(nextUser);
       return { ok: true };
     } catch (error: any) {
-      return { ok: false, error: getErrorFromResponse(error, 'Unable to reach server. Ensure backend is running and reachable.') };
+      return { ok: false, error: error?.message || 'Unable to login' };
     } finally {
       setLoading(false);
     }
   }, [persistUser]);
 
-  const register = React.useCallback(async (payload) => {
+  const register = React.useCallback(async (payload: { name?: string; fullName?: string; email: string; password: string; confirmPassword?: string }) => {
     setLoading(true);
+
+    if (payload.confirmPassword && payload.password !== payload.confirmPassword) {
+      setLoading(false);
+      return { ok: false, error: 'Passwords do not match' };
+    }
+
     try {
-      const data = await apiClient<any>(`${AUTH_API}/register`, {
+      const response = await apiClient<any>(`${AUTH_API}/register`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: payload.name || payload.fullName,
+          fullName: payload.fullName || payload.name,
+          email: payload.email,
+          password: payload.password,
+        }),
       });
-      const accessToken = data?.data?.accessToken ?? data?.accessToken;
-      if (typeof accessToken === 'string' && accessToken) setStoredToken(accessToken);
-      const registeredUser = getUserFromResponse(data);
-      if (!registeredUser) return { ok: false, error: 'Registration failed: invalid server response' };
-      persistUser(registeredUser);
+
+      const token = response?.data?.token || response?.data?.accessToken || response?.token || response?.accessToken;
+      if (token) setStoredToken(token);
+
+      const nextUser = readUserFromResponse(response);
+      if (!nextUser) return { ok: false, error: 'Registration failed: invalid server response' };
+
+      persistUser(nextUser);
       return { ok: true };
     } catch (error: any) {
-      return { ok: false, error: getErrorFromResponse(error, 'Unable to reach server. Ensure backend is running and reachable.') };
+      return { ok: false, error: error?.message || 'Unable to register' };
     } finally {
       setLoading(false);
     }
@@ -131,49 +160,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await apiClient(`${AUTH_API}/logout`, { method: 'POST' }).catch(() => {});
   }, [persistUser]);
 
-  const refreshUser = React.useCallback(async () => {
+  const updateProfile = React.useCallback(async (next: Pick<AuthUser, 'name' | 'fullName' | 'email' | 'phone' | 'address'>) => {
     try {
-      const data = await apiClient<any>(`${AUTH_API}/me`, { method: 'GET' });
-      const refreshedUser = getUserFromResponse(data);
-      if (refreshedUser) persistUser(refreshedUser);
+      const response = await apiClient<any>('/api/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: next.name || next.fullName,
+          fullName: next.fullName || next.name,
+          email: next.email,
+          phone: next.phone,
+          address: next.address,
+        }),
+      });
+
+      const updated = readUserFromResponse(response);
+      if (!updated) return { ok: false, error: 'Profile update failed: invalid server response' };
+
+      persistUser(updated);
+      return { ok: true };
     } catch (error: any) {
-      if (error?.status === 401 || error?.status === 403) {
-        persistUser(null);
-      }
+      return { ok: false, error: error?.message || 'Profile update failed' };
     }
   }, [persistUser]);
 
   const changePassword = React.useCallback(async (currentPassword: string, newPassword: string) => {
     try {
-      const data = await apiClient<any>(`/api/users/me/password`, {
-        method: 'PUT',
+      await apiClient('/api/users/me/password', {
+        method: 'PATCH',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      const next = getUserFromResponse(data);
-      if (next) persistUser({ ...user, ...next } as AuthUser);
       return { ok: true };
     } catch (error: any) {
-      return { ok: false, error: getErrorFromResponse(error, 'Password change failed') };
+      return { ok: false, error: error?.message || 'Password update failed' };
     }
-  }, [persistUser, user]);
+  }, []);
 
-  const updateProfile = React.useCallback(async (next) => {
-    try {
-      const data = await apiClient<any>(`/api/users/me`, { method: 'PUT', body: JSON.stringify(next) });
-      const updatedUser = getUserFromResponse(data);
-      if (!updatedUser) return { ok: false, error: 'Update failed: invalid server response' };
-      persistUser(updatedUser);
-      return { ok: true };
-    } catch (error: any) {
-      return { ok: false, error: getErrorFromResponse(error, 'Update failed') };
-    }
-  }, [persistUser]);
-
-  return <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateProfile, changePassword }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser: refreshMe,
+        refreshMe,
+        updateProfile,
+        changePassword,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-  const ctx = React.useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used inside AuthProvider');
+  }
+  return context;
 }

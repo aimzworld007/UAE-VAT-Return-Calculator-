@@ -2,6 +2,7 @@ import { verifyAccessToken } from '../lib/authTokens.js';
 
 function readToken(req) {
   if (req.cookies?.accessToken) return req.cookies.accessToken;
+  if (req.cookies?.token) return req.cookies.token;
   const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
   if (scheme === 'Bearer' && token) return token;
@@ -14,7 +15,11 @@ export function requireAuth(req, res, next) {
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = { id: payload.sub, email: payload.email, role: String(payload.role || 'user').toLowerCase() };
+    req.user = {
+      id: payload.sub,
+      email: payload.email,
+      role: String(payload.role || 'user').toLowerCase(),
+    };
     return next();
   } catch {
     return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Invalid or expired token' });

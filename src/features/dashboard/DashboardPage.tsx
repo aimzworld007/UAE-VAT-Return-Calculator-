@@ -9,16 +9,13 @@ import { LoadingState } from '../../shared/components/LoadingState';
 import { formatCurrency } from '../../shared/utils/formatCurrency';
 import { fetchDashboard } from './services/dashboardApi';
 
-function HistoryList({ records, emptyMessage }: { records: any[]; emptyMessage: string }) {
-  if (!records.length) return <EmptyState message={emptyMessage} />;
-
+function RecordRow({ record }: { record: any }) {
   return (
-    <Stack spacing={1}>
-      {records.map((record: any) => (
-        <Typography key={record.id} variant='body2'>
-          {record.period_label || 'N/A'} • {Number(record.sales_total || 0).toFixed(2)}
-        </Typography>
-      ))}
+    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent='space-between' sx={{ border: '1px solid #e2e8f0', borderRadius: 2, p: 1.2 }}>
+      <Typography variant='body2' sx={{ fontWeight: 600 }}>
+        {record.record_type === 'corporate_tax' ? 'Corporate Tax' : 'VAT'} • {String(record.period_start || '').slice(0, 10) || 'N/A'} - {String(record.period_end || '').slice(0, 10) || 'N/A'}
+      </Typography>
+      <Typography variant='caption' color='text.secondary'>{String(record.created_at || '').replace('T', ' ').slice(0, 19)}</Typography>
     </Stack>
   );
 }
@@ -28,38 +25,30 @@ export function DashboardPage() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
-  const [sessionExpired, setSessionExpired] = React.useState(false);
 
   React.useEffect(() => {
     fetchDashboard()
       .then((dashboardData) => {
         setData(dashboardData || null);
-        setSessionExpired(false);
         setError('');
       })
-      .catch((error: any) => {
-        if (error?.status === 401 || error?.status === 403) {
-          setSessionExpired(true);
-          setError('Your session has expired. Please sign in again to load dashboard details.');
-          return;
-        }
-        setSessionExpired(false);
-        setError('Dashboard data could not be loaded. Please try again.');
+      .catch((e: any) => {
+        setError(e?.message || 'Dashboard data could not be loaded.');
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const vatNet = Number(data?.totals?.vatNet || 0);
+  const latestVat = Number(data?.latestVatPayable || 0);
   const kpis = [
-    { label: 'Total VAT Records', value: data?.vatCount || 0 },
-    { label: 'Total Corporate Tax Records', value: data?.corporateTaxCount || 0 },
-    { label: 'Total Sales', value: formatCurrency(Number(data?.totals?.sales || 0)) },
-    { label: 'Total Expenses', value: formatCurrency(Number(data?.totals?.expenses || 0)) },
-    {
-      label: 'VAT Payable / Refundable',
-      value: vatNet >= 0 ? `Payable ${formatCurrency(vatNet)}` : `Refundable ${formatCurrency(Math.abs(vatNet))}`,
-    },
+    { label: 'VAT Records', value: data?.totalVatRecords || 0 },
+    { label: 'Corporate Tax Records', value: data?.totalCorporateTaxRecords || 0 },
+    { label: 'Latest VAT Position', value: latestVat >= 0 ? `Payable ${formatCurrency(latestVat)}` : `Refundable ${formatCurrency(Math.abs(latestVat))}` },
+    { label: 'Latest Corporate Tax', value: formatCurrency(Number(data?.latestCorporateTax || 0)) },
+    { label: 'Upcoming Reminders', value: data?.upcomingReminders?.length || 0 },
+    { label: 'Revenue (Saved Records)', value: formatCurrency(Number(data?.totalRevenueFromTaxRecords || 0)) },
   ];
+
+  const isNewUser = Number(data?.totalVatRecords || 0) === 0 && Number(data?.totalCorporateTaxRecords || 0) === 0;
 
   return (
     <DashboardLayout>
@@ -67,62 +56,46 @@ export function DashboardPage() {
         <Card variant='outlined'>
           <CardContent>
             <Typography variant='h4' sx={{ fontWeight: 800 }}>
-              Welcome back, {user?.fullName || user?.email}
+              Welcome back, {user?.fullName || user?.name || user?.email}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button component={RouteLink} to='/vat/business-details' variant='contained'>
-                New VAT Return
-              </Button>
-              <Button component={RouteLink} to='/tax/business-details' variant='contained'>
-                New Corporate Tax
-              </Button>
+              <Button component={RouteLink} to='/vat/details' variant='contained'>Create VAT Return</Button>
+              <Button component={RouteLink} to='/tax/details' variant='contained'>Create Corporate Tax Record</Button>
             </Stack>
           </CardContent>
         </Card>
 
         {loading && <LoadingState message='Loading dashboard…' />}
-        {!loading && error && (
-          <Card variant='outlined'>
-            <CardContent>
-              <ErrorState message={error} />
-              {sessionExpired && (
-                <Button component={RouteLink} to='/login' variant='contained' sx={{ mt: 1.5 }}>
-                  Sign In
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+        {!loading && error && <ErrorState message={error} />}
+
+        {!loading && !error && (
+          <>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))', lg: 'repeat(3,minmax(0,1fr))' }, gap: 1.5 }}>
+              {kpis.map((kpi: any) => (
+                <Card key={kpi.label} variant='outlined'>
+                  <CardContent>
+                    <Typography variant='body2' color='text.secondary'>{kpi.label}</Typography>
+                    <Typography variant='h5' sx={{ fontWeight: 800 }}>{kpi.value}</Typography>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
+
+            {isNewUser ? (
+              <EmptyState message='No VAT or corporate tax records yet. Start by creating your first record.' />
+            ) : (
+              <Card variant='outlined'>
+                <CardContent>
+                  <Typography variant='h6' sx={{ mb: 1.2 }}>Recent History</Typography>
+                  <Stack spacing={1}>
+                    {(data?.recentRecords || []).length === 0 && <EmptyState message='No recent records found.' />}
+                    {(data?.recentRecords || []).map((record: any) => <RecordRow key={`${record.record_type}-${record.id}`} record={record} />)}
+                  </Stack>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, gap: 1.5 }}>
-          {kpis.map((kpi: any) => (
-            <Card key={kpi.label} variant='outlined'>
-              <CardContent>
-                <Typography variant='body2' color='text.secondary'>
-                  {kpi.label}
-                </Typography>
-                <Typography variant='h5' sx={{ fontWeight: 800 }}>
-                  {kpi.value}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-
-        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
-          <Card variant='outlined' sx={{ flex: 1 }}>
-            <CardContent>
-              <Typography variant='h6'>Recent VAT Records</Typography>
-              <HistoryList records={data?.recentVatRecords || []} emptyMessage='No recent VAT records found.' />
-            </CardContent>
-          </Card>
-          <Card variant='outlined' sx={{ flex: 1 }}>
-            <CardContent>
-              <Typography variant='h6'>Recent Corporate Tax Records</Typography>
-              <HistoryList records={data?.recentCorporateTaxRecords || []} emptyMessage='No recent corporate tax records found.' />
-            </CardContent>
-          </Card>
-        </Stack>
       </Stack>
     </DashboardLayout>
   );

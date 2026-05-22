@@ -11,10 +11,10 @@ if (!email || !password || !name) {
 await ensureSchema();
 const hash = await bcrypt.hash(password, 12);
 await query(
-  `INSERT INTO users (full_name,email,password_hash,role,is_active,updated_at)
-   VALUES ($1,$2,$3,'superadmin',TRUE,NOW())
+  `INSERT INTO users (name,full_name,email,password_hash,role,is_active,updated_at)
+   VALUES ($1,$1,$2,$3,'superadmin',TRUE,NOW())
    ON CONFLICT (email) DO UPDATE
-   SET full_name=EXCLUDED.full_name,password_hash=EXCLUDED.password_hash,role='superadmin',is_active=TRUE,updated_at=NOW()`,
+   SET name=EXCLUDED.name,full_name=EXCLUDED.full_name,password_hash=EXCLUDED.password_hash,role='superadmin',is_active=TRUE,updated_at=NOW()`,
   [name, email.toLowerCase(), hash]
 );
 console.log(`Superadmin upserted for ${email.toLowerCase()}`);
