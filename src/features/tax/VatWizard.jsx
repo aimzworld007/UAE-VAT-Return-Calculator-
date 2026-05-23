@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Box, Button, Card, CardContent, Chip, FormControl, FormHelperText, Grid, InputAdornment, InputLabel, LinearProgress, MenuItem, Select, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Chip, FormControl, FormControlLabel, FormHelperText, Grid, InputAdornment, InputLabel, LinearProgress, MenuItem, Select, Stack, Switch, TextField, Tooltip, Typography } from '@mui/material';
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -29,7 +29,7 @@ import { MONTHS, formatVatPeriodLabel, getPeriodFromSelection } from './lib/vatP
 import { VAT_PRICING_MODES, splitVatFromAmount } from './lib/vatPricing';
 import { downloadPdf, generateVatPdfBlob } from './services/vatPdfApi';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import { listBusinessProfiles } from '../business/services/businessProfileApi';
+import { createBusinessProfile, listBusinessProfiles, updateBusinessProfile } from '../business/services/businessProfileApi';
 
 const steps = [
   { key: 'business', label: 'Business Details', icon: Building2 },
@@ -66,6 +66,10 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
   const [businessProfiles, setBusinessProfiles] = React.useState([]);
   const [selectedBusinessProfileId, setSelectedBusinessProfileId] = React.useState('');
   const [businessProfilesError, setBusinessProfilesError] = React.useState('');
+  const [businessProfileStatus, setBusinessProfileStatus] = React.useState('');
+  const [autoSaveProfileEnabled, setAutoSaveProfileEnabled] = React.useState(true);
+  const saveTimerRef = React.useRef(null);
+  const lastSavedFingerprintRef = React.useRef('');
   const result = calculateVat(data);
   const reqErr = validateBusinessName(data.businessName) || validateTrn(data.trn) || validateRequired(data.businessLocationEmirate, 'Business location emirate') || validateVatPeriodSelection(data);
 
@@ -85,6 +89,7 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
         setBusinessProfiles(Array.isArray(profiles) ? profiles : []);
         const defaultProfile = (profiles || []).find((p) => p?.isDefault) || (profiles || [])[0];
         if (defaultProfile?.id) setSelectedBusinessProfileId(defaultProfile.id);
+        else setSelectedBusinessProfileId('new');
       })
       .catch(() => {
         if (!alive) return;
@@ -95,8 +100,87 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
     };
   }, []);
 
+  const buildBusinessProfilePayload = React.useCallback(() => {
+    const trn = String(data.trn || '').replace(/[^0-9]/g, '');
+    return {
+      businessName: String(data.businessName || '').trim(),
+      trn,
+      emirate: data.businessLocationEmirate || null,
+      activity: null,
+      vatFilingFrequency: data.filingFrequency || null,
+      defaultVatPricingMode: data.vatPricingMode === VAT_PRICING_MODES.INCLUSIVE ? 'Tax Inclusive' : 'Tax Exclusive',
+      corporateTaxYearStart: null,
+      corporateTaxYearEnd: null,
+      address: null,
+      phone: null,
+      email: null,
+    };
+  }, [data.businessName, data.trn, data.businessLocationEmirate, data.filingFrequency, data.vatPricingMode]);
+
+  const canSaveBusinessProfile = React.useCallback(() => {
+    const payload = buildBusinessProfilePayload();
+    if (!payload.businessName || payload.businessName.length < 2) return false;
+    if (payload.trn && !/^\d{5,20}$/.test(payload.trn)) return false;
+    return true;
+  }, [buildBusinessProfilePayload]);
+
+  const saveBusinessProfileFromWizard = React.useCallback(
+    async ({ forceNew = false, silent = false } = {}) => {
+      if (!canSaveBusinessProfile()) {
+        if (!silent) setBusinessProfileStatus('Enter valid business name and TRN to save profile.');
+        return null;
+      }
+
+      const payload = buildBusinessProfilePayload();
+      const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
+      const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
+      if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
+
+      let saved;
+      if (targetId) {
+        saved = await updateBusinessProfile(targetId, payload);
+      } else {
+        saved = await createBusinessProfile(payload);
+      }
+
+      if (!saved?.id) return null;
+
+      setBusinessProfiles((prev) => {
+        const next = prev.filter((p) => p.id !== saved.id);
+        return [saved, ...next];
+      });
+      setSelectedBusinessProfileId(saved.id);
+      setData((prev) => ({ ...prev, businessProfileId: saved.id }));
+      lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
+      setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
+      return saved;
+    },
+    [buildBusinessProfilePayload, canSaveBusinessProfile, selectedBusinessProfileId, setData]
+  );
+
+  React.useEffect(() => {
+    if (step !== 1 || !autoSaveProfileEnabled) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveBusinessProfileFromWizard({ silent: true }).catch(() => {});
+    }, 1200);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [
+    step,
+    autoSaveProfileEnabled,
+    saveBusinessProfileFromWizard,
+    selectedBusinessProfileId,
+    data.businessName,
+    data.trn,
+    data.businessLocationEmirate,
+    data.filingFrequency,
+    data.vatPricingMode,
+  ]);
+
   const importSelectedBusinessProfile = () => {
-    if (!selectedBusinessProfileId) return;
+    if (!selectedBusinessProfileId || selectedBusinessProfileId === 'new') return;
     const selected = businessProfiles.find((profile) => profile.id === selectedBusinessProfileId);
     if (!selected) return;
 
@@ -114,6 +198,7 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
       filingFrequency: selected.vatFilingFrequency || data.filingFrequency,
       vatPricingMode: nextVatMode,
     });
+    setBusinessProfileStatus('Business profile imported.');
   };
 
   const next = () => {
@@ -246,8 +331,16 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
             <Select
               label='Import from Saved Business Profile'
               value={selectedBusinessProfileId}
-              onChange={(e) => setSelectedBusinessProfileId(e.target.value)}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setSelectedBusinessProfileId(nextId);
+                setData({
+                  ...data,
+                  businessProfileId: nextId === 'new' ? null : nextId,
+                });
+              }}
             >
+              <MenuItem value='new'>Create from current form input</MenuItem>
               {businessProfiles.map((profile) => (
                 <MenuItem key={profile.id} value={profile.id}>
                   {profile.businessName || 'Unnamed Business'} {profile.isDefault ? '(Default)' : ''}
@@ -255,10 +348,22 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
               ))}
             </Select>
           </FormControl>
-          <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId}>
+          <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId || selectedBusinessProfileId === 'new'}>
             Import Profile
           </Button>
+          <Button variant='outlined' onClick={() => saveBusinessProfileFromWizard({ forceNew: false, silent: false })}>
+            Save Profile
+          </Button>
+          <Button variant='outlined' onClick={() => saveBusinessProfileFromWizard({ forceNew: true, silent: false })}>
+            Save as New
+          </Button>
         </Stack>
+        <FormControlLabel
+          sx={{ mt: 0.5 }}
+          control={<Switch checked={autoSaveProfileEnabled} onChange={(e) => setAutoSaveProfileEnabled(e.target.checked)} />}
+          label='Auto-save as business profile while typing'
+        />
+        {businessProfileStatus && <FormHelperText>{businessProfileStatus}</FormHelperText>}
         {businessProfilesError && <FormHelperText error>{businessProfilesError}</FormHelperText>}
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Business name' value={data.businessName} onChange={e => setData({ ...data, businessName: e.target.value })} sx={fieldSx} /></Grid>

@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   FormControl,
+  FormControlLabel,
   FormHelperText,
   Grid,
   InputAdornment,
@@ -14,6 +15,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Typography
 } from '@mui/material';
@@ -31,7 +33,7 @@ import { ExportActions, money } from './components/common.jsx';
 import { CorporateTaxReport } from './components/CorporateTaxReport';
 import { calculateCorporateTax } from './lib/corporateTaxCalculator';
 import { downloadPdfReport } from './lib/pdfGenerator';
-import { listBusinessProfiles } from '../business/services/businessProfileApi';
+import { createBusinessProfile, listBusinessProfiles, updateBusinessProfile } from '../business/services/businessProfileApi';
 
 const steps = [
   { key: 'company', label: 'Company Details', icon: Building2 },
@@ -47,6 +49,10 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
   const [businessProfiles, setBusinessProfiles] = React.useState([]);
   const [selectedBusinessProfileId, setSelectedBusinessProfileId] = React.useState('');
   const [businessProfilesError, setBusinessProfilesError] = React.useState('');
+  const [businessProfileStatus, setBusinessProfileStatus] = React.useState('');
+  const [autoSaveProfileEnabled, setAutoSaveProfileEnabled] = React.useState(true);
+  const saveTimerRef = React.useRef(null);
+  const lastSavedFingerprintRef = React.useRef('');
   const result = calculateCorporateTax(data);
   const stepToPath = React.useMemo(() => ({ 1: '/tax/details', 2: '/tax/input', 3: '/tax/preview', 4: '/tax/export' }), []);
 
@@ -64,6 +70,7 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
         setBusinessProfiles(Array.isArray(profiles) ? profiles : []);
         const defaultProfile = (profiles || []).find((p) => p?.isDefault) || (profiles || [])[0];
         if (defaultProfile?.id) setSelectedBusinessProfileId(defaultProfile.id);
+        else setSelectedBusinessProfileId('new');
       })
       .catch(() => {
         if (!alive) return;
@@ -74,8 +81,88 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
     };
   }, []);
 
+  const buildBusinessProfilePayload = React.useCallback(() => {
+    const trn = String(data.taxRegistrationNumber || '').replace(/[^0-9]/g, '');
+    return {
+      businessName: String(data.companyName || '').trim(),
+      trn,
+      emirate: data.businessLocationEmirate || null,
+      activity: data.businessActivity || null,
+      vatFilingFrequency: null,
+      defaultVatPricingMode: null,
+      corporateTaxYearStart: data.financialYearStart || null,
+      corporateTaxYearEnd: data.financialYearEnd || null,
+      address: null,
+      phone: null,
+      email: null,
+    };
+  }, [data.companyName, data.taxRegistrationNumber, data.businessLocationEmirate, data.businessActivity, data.financialYearStart, data.financialYearEnd]);
+
+  const canSaveBusinessProfile = React.useCallback(() => {
+    const payload = buildBusinessProfilePayload();
+    if (!payload.businessName || payload.businessName.length < 2) return false;
+    if (payload.trn && !/^\d{5,20}$/.test(payload.trn)) return false;
+    return true;
+  }, [buildBusinessProfilePayload]);
+
+  const saveBusinessProfileFromWizard = React.useCallback(
+    async ({ forceNew = false, silent = false } = {}) => {
+      if (!canSaveBusinessProfile()) {
+        if (!silent) setBusinessProfileStatus('Enter valid company name and registration number to save profile.');
+        return null;
+      }
+
+      const payload = buildBusinessProfilePayload();
+      const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
+      const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
+      if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
+
+      let saved;
+      if (targetId) {
+        saved = await updateBusinessProfile(targetId, payload);
+      } else {
+        saved = await createBusinessProfile(payload);
+      }
+
+      if (!saved?.id) return null;
+
+      setBusinessProfiles((prev) => {
+        const next = prev.filter((p) => p.id !== saved.id);
+        return [saved, ...next];
+      });
+      setSelectedBusinessProfileId(saved.id);
+      setData((prev) => ({ ...prev, businessProfileId: saved.id }));
+      lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
+      setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
+      return saved;
+    },
+    [buildBusinessProfilePayload, canSaveBusinessProfile, selectedBusinessProfileId, setData]
+  );
+
+  React.useEffect(() => {
+    if (step !== 1 || !autoSaveProfileEnabled) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveBusinessProfileFromWizard({ silent: true }).catch(() => {});
+    }, 1200);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [
+    step,
+    autoSaveProfileEnabled,
+    saveBusinessProfileFromWizard,
+    selectedBusinessProfileId,
+    data.companyName,
+    data.taxRegistrationNumber,
+    data.businessActivity,
+    data.businessLocationEmirate,
+    data.financialYearStart,
+    data.financialYearEnd,
+  ]);
+
   const importSelectedBusinessProfile = () => {
-    if (!selectedBusinessProfileId) return;
+    if (!selectedBusinessProfileId || selectedBusinessProfileId === 'new') return;
     const selected = businessProfiles.find((profile) => profile.id === selectedBusinessProfileId);
     if (!selected) return;
 
@@ -89,6 +176,7 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
       financialYearStart: selected.corporateTaxYearStart || data.financialYearStart,
       financialYearEnd: selected.corporateTaxYearEnd || data.financialYearEnd,
     });
+    setBusinessProfileStatus('Business profile imported.');
   };
 
   const fieldSx = {
@@ -190,8 +278,16 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
                   <Select
                     label='Import from Saved Business Profile'
                     value={selectedBusinessProfileId}
-                    onChange={(e) => setSelectedBusinessProfileId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setSelectedBusinessProfileId(nextId);
+                      setData({
+                        ...data,
+                        businessProfileId: nextId === 'new' ? null : nextId,
+                      });
+                    }}
                   >
+                    <MenuItem value='new'>Create from current form input</MenuItem>
                     {businessProfiles.map((profile) => (
                       <MenuItem key={profile.id} value={profile.id}>
                         {profile.businessName || 'Unnamed Business'} {profile.isDefault ? '(Default)' : ''}
@@ -199,10 +295,22 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
                     ))}
                   </Select>
                 </FormControl>
-                <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId}>
+                <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId || selectedBusinessProfileId === 'new'}>
                   Import Profile
                 </Button>
+                <Button variant='outlined' onClick={() => saveBusinessProfileFromWizard({ forceNew: false, silent: false })}>
+                  Save Profile
+                </Button>
+                <Button variant='outlined' onClick={() => saveBusinessProfileFromWizard({ forceNew: true, silent: false })}>
+                  Save as New
+                </Button>
               </Stack>
+              <FormControlLabel
+                sx={{ mt: 0.5 }}
+                control={<Switch checked={autoSaveProfileEnabled} onChange={(e) => setAutoSaveProfileEnabled(e.target.checked)} />}
+                label='Auto-save as business profile while typing'
+              />
+              {businessProfileStatus && <FormHelperText>{businessProfileStatus}</FormHelperText>}
               {businessProfilesError && <FormHelperText error>{businessProfilesError}</FormHelperText>}
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Company name' value={data.companyName} onChange={e => setData({ ...data, companyName: e.target.value })} sx={fieldSx} /></Grid>
