@@ -106,15 +106,17 @@ function LoginPage() {
 
   return (
     <AuthLayout>
-      <Card>
-        <CardContent>
+      <Card variant='outlined' sx={{ borderRadius: 3, boxShadow: '0 12px 30px rgba(2, 8, 23, 0.08)' }}>
+        <CardContent sx={{ p: { xs: 2.2, sm: 2.8 } }}>
           <Stack component='form' spacing={2} onSubmit={onSubmit}>
-            <Typography variant='h5'>Login</Typography>
-            <TextField label='Email' value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Typography variant='h5' sx={{ fontWeight: 800 }}>Login</Typography>
+            <Typography variant='body2' color='text.secondary'>Access your UAE VAT & Corporate Tax dashboard.</Typography>
+            <TextField label='Email Address' value={email} onChange={(e) => setEmail(e.target.value)} required />
             <TextField label='Password' type='password' value={password} onChange={(e) => setPassword(e.target.value)} required />
             {error && <Alert severity='error'>{error}</Alert>}
-            <Button type='submit' variant='contained' disabled={loading}>Login</Button>
-            <Button onClick={() => navigate('/register')}>Create account</Button>
+            <Button type='submit' variant='contained' size='large' disabled={loading}>Login</Button>
+            <Button variant='text' onClick={() => navigate('/register')}>Go to Registration</Button>
+            <Button variant='outlined' onClick={() => navigate('/')}>Back to Home Page</Button>
           </Stack>
         </CardContent>
       </Card>
@@ -137,16 +139,19 @@ function RegisterPage() {
 
   return (
     <AuthLayout>
-      <Card>
-        <CardContent>
+      <Card variant='outlined' sx={{ borderRadius: 3, boxShadow: '0 12px 30px rgba(2, 8, 23, 0.08)' }}>
+        <CardContent sx={{ p: { xs: 2.2, sm: 2.8 } }}>
           <Stack component='form' spacing={2} onSubmit={onSubmit}>
-            <Typography variant='h5'>Register</Typography>
-            <TextField label='Full name' value={form.fullName} onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))} required />
-            <TextField label='Email' value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} required />
+            <Typography variant='h5' sx={{ fontWeight: 800 }}>Registration</Typography>
+            <Typography variant='body2' color='text.secondary'>Create your secure account to start VAT and tax filing.</Typography>
+            <TextField label='Full Name' value={form.fullName} onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))} required />
+            <TextField label='Email Address' value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} required />
             <TextField label='Password' type='password' value={form.password} onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))} required />
             <TextField label='Confirm Password' type='password' value={form.confirmPassword} onChange={(e) => setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))} required />
             {error && <Alert severity='error'>{error}</Alert>}
-            <Button type='submit' variant='contained' disabled={loading}>Create account</Button>
+            <Button type='submit' variant='contained' size='large' disabled={loading}>Create Account</Button>
+            <Button variant='text' onClick={() => navigate('/login')}>Already have an account? Login Form</Button>
+            <Button variant='outlined' onClick={() => navigate('/')}>Back to Home Page</Button>
           </Stack>
         </CardContent>
       </Card>
