@@ -64,6 +64,14 @@ function mapRecord(row) {
   };
 }
 
+async function validateBusinessProfileAccess(req, businessProfileId) {
+  if (!businessProfileId) return true;
+  if (req.user.role === 'superadmin') return true;
+
+  const result = await query('SELECT id FROM business_profiles WHERE id = $1 AND user_id = $2 LIMIT 1', [businessProfileId, req.user.id]);
+  return Boolean(result.rowCount);
+}
+
 function accessWhere(req, userIdParamIndex = 1) {
   if (req.user.role === 'superadmin') {
     return { clause: '1=1', params: [] };
@@ -160,6 +168,12 @@ router.post('/', async (req, res) => {
   }
 
   const p = parsed.data;
+  if (p.businessProfileId) {
+    const hasAccess = await validateBusinessProfileAccess(req, p.businessProfileId);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Invalid business profile access' });
+    }
+  }
   const netVat = toNumber(req.body?.result?.netVat ?? req.body?.netVat);
   const summaryPayable = typeof p.payableVat === 'number' ? p.payableVat : netVat > 0 ? netVat : 0;
   const summaryRefundable = typeof p.refundableVat === 'number' ? p.refundableVat : netVat < 0 ? Math.abs(netVat) : 0;
@@ -216,6 +230,12 @@ router.put('/:id', async (req, res) => {
   }
 
   const p = parsed.data;
+  if (p.businessProfileId) {
+    const hasAccess = await validateBusinessProfileAccess(req, p.businessProfileId);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Invalid business profile access' });
+    }
+  }
   const payload = typeof p.payload !== 'undefined' ? p.payload : row.payload || {};
   const netVat = toNumber(payload?.result?.netVat ?? payload?.netVat);
 

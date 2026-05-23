@@ -10,7 +10,6 @@ import authRoutes from './routes/authRoutes.js';
 import taxRecordRoutes from './routes/taxRecordRoutes.js';
 import vatPdfRoutes from './routes/vatPdfRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
-import appRoutes from './routes/appRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import businessProfileRoutes from './routes/businessProfileRoutes.js';
 import vatRecordRoutes from './routes/vatRecordRoutes.js';
@@ -49,7 +48,6 @@ export function createApp() {
   app.use('/api/reminders', reminderRoutes);
   app.use('/api/admin', requireAuth, requireSuperadmin, adminRoutes);
   app.use('/api', vatPdfRoutes);
-  app.use('/api', appRoutes);
 
   app.get('/api/health', (_, res) => {
     res.json({ status: 'ok' });

@@ -1,33 +1,26 @@
+import { apiDelete, apiGet, apiPost, apiPut } from '../../../shared/utils/apiClient';
+
 export async function createTaxRecord(payload: {
   taxType: 'VAT' | 'CORPORATE';
+  businessProfileId?: string | null;
+  periodType?: string | null;
   periodStart?: string | null;
   periodEnd?: string | null;
   inputPayload: Record<string, unknown>;
   resultPayload: Record<string, unknown>;
 }) {
-  const res = await fetch('/api/tax-records', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || 'Unable to save record');
-  return data;
+  const response = await apiPost('/api/tax-records', payload);
+  return response;
 }
 
 export async function listTaxRecords() {
-  const res = await fetch('/api/tax-records', { credentials: 'include' });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || 'Unable to load records');
-  return data?.data?.records || [];
+  const response = await apiGet('/api/tax-records');
+  return response?.data?.records || [];
 }
 
 export async function getTaxRecord(id: string) {
-  const res = await fetch(`/api/tax-records/${id}`, { credentials: 'include' });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || 'Unable to load record');
-  return data?.data?.record;
+  const response = await apiGet(`/api/tax-records/${id}`);
+  return response?.data?.record;
 }
 
 export async function updateTaxRecord(
@@ -39,23 +32,11 @@ export async function updateTaxRecord(
     resultPayload: Record<string, unknown>;
   }>
 ) {
-  const res = await fetch(`/api/tax-records/${id}`, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || 'Unable to update record');
-  return data?.data?.record;
+  const response = await apiPut(`/api/tax-records/${id}`, payload);
+  return response?.data?.record;
 }
 
 export async function deleteTaxRecord(id: string) {
-  const res = await fetch(`/api/tax-records/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || 'Unable to delete record');
-  return data?.data?.id;
+  const response = await apiDelete(`/api/tax-records/${id}`);
+  return response?.data?.id;
 }

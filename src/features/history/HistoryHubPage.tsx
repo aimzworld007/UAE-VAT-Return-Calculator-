@@ -8,6 +8,7 @@ import { CorporateTaxHistoryTable } from './components/CorporateTaxHistoryTable'
 import { HistoryDetailDialog } from './components/HistoryDetailDialog';
 import { deleteCorporateTaxHistoryRecord, deleteVatHistoryRecord, getCorporateTaxHistoryRecord, getVatHistoryRecord, listCorporateTaxHistory, listVatHistory } from './services/historyApi';
 import { downloadVatHistoryPdf } from '../tax/services/vatPdfApi';
+import { downloadCorporateTaxHistoryPdf } from '../tax/services/corporateTaxPdfApi';
 
 export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
   const [tab, setTab] = React.useState<'vat' | 'tax'>(initialTab);
@@ -62,5 +63,16 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
     }
   };
 
-  return <DashboardLayout><Stack spacing={2.2}><HistoryTabs value={tab} onChange={setTab} /><HistoryFilters query={query} onQueryChange={setQuery} />{error && <Alert severity='error'>{error}</Alert>}{tab === 'vat' ? <VatHistoryTable records={filtered} onView={onView} onDelete={onDelete} onDownload={onDownloadVat} downloadingId={downloadingId} /> : <CorporateTaxHistoryTable records={filtered} onView={onView} onDelete={onDelete} />}<HistoryDetailDialog open={Boolean(detail)} record={detail} onClose={() => setDetail(null)} /></Stack></DashboardLayout>;
+  const onDownloadTax = async (record: any) => {
+    try {
+      setDownloadingId(record.id);
+      await downloadCorporateTaxHistoryPdf(record);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to download Corporate Tax PDF.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  return <DashboardLayout><Stack spacing={2.2}><HistoryTabs value={tab} onChange={setTab} /><HistoryFilters query={query} onQueryChange={setQuery} />{error && <Alert severity='error'>{error}</Alert>}{tab === 'vat' ? <VatHistoryTable records={filtered} onView={onView} onDelete={onDelete} onDownload={onDownloadVat} downloadingId={downloadingId} /> : <CorporateTaxHistoryTable records={filtered} onView={onView} onDelete={onDelete} onDownload={onDownloadTax} downloadingId={downloadingId} />}<HistoryDetailDialog open={Boolean(detail)} record={detail} onClose={() => setDetail(null)} /></Stack></DashboardLayout>;
 }

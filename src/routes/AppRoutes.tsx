@@ -200,6 +200,8 @@ function RoutedModules() {
   const handleSaveVatRecord = React.useCallback(async () => {
     await createTaxRecord({
       taxType: 'VAT',
+      businessProfileId: vat.businessProfileId || null,
+      periodType: vat.filingFrequency || null,
       periodStart: toIsoOrNull(vat.taxPeriodStart),
       periodEnd: toIsoOrNull(vat.taxPeriodEnd),
       inputPayload: vat,
@@ -210,6 +212,7 @@ function RoutedModules() {
   const handleSaveTaxRecord = React.useCallback(async () => {
     await createTaxRecord({
       taxType: 'CORPORATE',
+      businessProfileId: ct.businessProfileId || null,
       periodStart: toIsoOrNull(ct.financialYearStart),
       periodEnd: toIsoOrNull(ct.financialYearEnd),
       inputPayload: ct,

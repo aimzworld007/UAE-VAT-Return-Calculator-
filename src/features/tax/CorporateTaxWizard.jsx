@@ -31,6 +31,7 @@ import { ExportActions, money } from './components/common.jsx';
 import { CorporateTaxReport } from './components/CorporateTaxReport';
 import { calculateCorporateTax } from './lib/corporateTaxCalculator';
 import { downloadPdfReport } from './lib/pdfGenerator';
+import { listBusinessProfiles } from '../business/services/businessProfileApi';
 
 const steps = [
   { key: 'company', label: 'Company Details', icon: Building2 },
@@ -43,6 +44,9 @@ const EMIRATE_OPTIONS = ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Umm Al Quwai
 
 export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressChange, forcedStep, navigateToStep }) {
   const [step, setStep] = React.useState(forcedStep || 1);
+  const [businessProfiles, setBusinessProfiles] = React.useState([]);
+  const [selectedBusinessProfileId, setSelectedBusinessProfileId] = React.useState('');
+  const [businessProfilesError, setBusinessProfilesError] = React.useState('');
   const result = calculateCorporateTax(data);
   const stepToPath = React.useMemo(() => ({ 1: '/tax/details', 2: '/tax/input', 3: '/tax/preview', 4: '/tax/export' }), []);
 
@@ -51,6 +55,41 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
   }, [step, onProgressChange]);
 
   React.useEffect(() => { if (forcedStep) setStep(forcedStep); }, [forcedStep]);
+
+  React.useEffect(() => {
+    let alive = true;
+    listBusinessProfiles()
+      .then((profiles) => {
+        if (!alive) return;
+        setBusinessProfiles(Array.isArray(profiles) ? profiles : []);
+        const defaultProfile = (profiles || []).find((p) => p?.isDefault) || (profiles || [])[0];
+        if (defaultProfile?.id) setSelectedBusinessProfileId(defaultProfile.id);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setBusinessProfilesError('Unable to load saved business profiles.');
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const importSelectedBusinessProfile = () => {
+    if (!selectedBusinessProfileId) return;
+    const selected = businessProfiles.find((profile) => profile.id === selectedBusinessProfileId);
+    if (!selected) return;
+
+    setData({
+      ...data,
+      businessProfileId: selected.id,
+      companyName: selected.businessName || data.companyName,
+      taxRegistrationNumber: selected.trn || data.taxRegistrationNumber,
+      businessActivity: selected.activity || data.businessActivity,
+      businessLocationEmirate: selected.emirate || data.businessLocationEmirate,
+      financialYearStart: selected.corporateTaxYearStart || data.financialYearStart,
+      financialYearEnd: selected.corporateTaxYearEnd || data.financialYearEnd,
+    });
+  };
 
   const fieldSx = {
     '& .MuiInputBase-root': { minHeight: { xs: 44, md: 48 }, height: { xs: 44, md: 48 }, borderRadius: '12px', color: '#071832', bgcolor: '#fff' },
@@ -144,6 +183,28 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
             </Box>
           </Stack>
           <Grid container spacing={{ xs: 1.5, md: 2 }}>
+            <Grid size={12}>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                <FormControl fullWidth sx={fieldSx}>
+                  <InputLabel>Import from Saved Business Profile</InputLabel>
+                  <Select
+                    label='Import from Saved Business Profile'
+                    value={selectedBusinessProfileId}
+                    onChange={(e) => setSelectedBusinessProfileId(e.target.value)}
+                  >
+                    {businessProfiles.map((profile) => (
+                      <MenuItem key={profile.id} value={profile.id}>
+                        {profile.businessName || 'Unnamed Business'} {profile.isDefault ? '(Default)' : ''}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId}>
+                  Import Profile
+                </Button>
+              </Stack>
+              {businessProfilesError && <FormHelperText error>{businessProfilesError}</FormHelperText>}
+            </Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Company name' value={data.companyName} onChange={e => setData({ ...data, companyName: e.target.value })} sx={fieldSx} /></Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Tax registration number' value={data.taxRegistrationNumber} onChange={e => setData({ ...data, taxRegistrationNumber: e.target.value })} sx={fieldSx} /></Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Business activity' value={data.businessActivity} onChange={e => setData({ ...data, businessActivity: e.target.value })} sx={fieldSx} /></Grid>

@@ -29,6 +29,7 @@ import { MONTHS, formatVatPeriodLabel, getPeriodFromSelection } from './lib/vatP
 import { VAT_PRICING_MODES, splitVatFromAmount } from './lib/vatPricing';
 import { downloadPdf, generateVatPdfBlob } from './services/vatPdfApi';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import { listBusinessProfiles } from '../business/services/businessProfileApi';
 
 const steps = [
   { key: 'business', label: 'Business Details', icon: Building2 },
@@ -62,6 +63,9 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
   const [step, setStep] = React.useState(forcedStep || 1);
   const stepToPath = React.useMemo(() => ({ 1: '/vat/business-details', 2: '/vat/input', 3: '/vat/preview', 4: '/vat/export' }), []);
   const [downloadLoading, setDownloadLoading] = React.useState(false);
+  const [businessProfiles, setBusinessProfiles] = React.useState([]);
+  const [selectedBusinessProfileId, setSelectedBusinessProfileId] = React.useState('');
+  const [businessProfilesError, setBusinessProfilesError] = React.useState('');
   const result = calculateVat(data);
   const reqErr = validateBusinessName(data.businessName) || validateTrn(data.trn) || validateRequired(data.businessLocationEmirate, 'Business location emirate') || validateVatPeriodSelection(data);
 
@@ -72,6 +76,45 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
       setData({ ...data, ...period, monthlyEntries: nextEntries });
     }
   }, [data.filingFrequency, data.filingYear, data.filingMonth, data.filingQuarter, data.filingStartMonth]);
+
+  React.useEffect(() => {
+    let alive = true;
+    listBusinessProfiles()
+      .then((profiles) => {
+        if (!alive) return;
+        setBusinessProfiles(Array.isArray(profiles) ? profiles : []);
+        const defaultProfile = (profiles || []).find((p) => p?.isDefault) || (profiles || [])[0];
+        if (defaultProfile?.id) setSelectedBusinessProfileId(defaultProfile.id);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setBusinessProfilesError('Unable to load saved business profiles.');
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const importSelectedBusinessProfile = () => {
+    if (!selectedBusinessProfileId) return;
+    const selected = businessProfiles.find((profile) => profile.id === selectedBusinessProfileId);
+    if (!selected) return;
+
+    const nextVatMode =
+      String(selected.defaultVatPricingMode || '').toLowerCase().includes('inclusive')
+        ? VAT_PRICING_MODES.INCLUSIVE
+        : VAT_PRICING_MODES.EXCLUSIVE;
+
+    setData({
+      ...data,
+      businessProfileId: selected.id,
+      businessName: selected.businessName || data.businessName,
+      trn: selected.trn || data.trn,
+      businessLocationEmirate: selected.emirate || data.businessLocationEmirate,
+      filingFrequency: selected.vatFilingFrequency || data.filingFrequency,
+      vatPricingMode: nextVatMode,
+    });
+  };
 
   const next = () => {
     const nextStep = Math.min(4, step + 1);
@@ -196,6 +239,28 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
         </Box>
       </Stack>
       <Grid container spacing={{ xs: 1.5, md: 2 }}>
+      <Grid size={12}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+          <FormControl fullWidth sx={fieldSx}>
+            <InputLabel>Import from Saved Business Profile</InputLabel>
+            <Select
+              label='Import from Saved Business Profile'
+              value={selectedBusinessProfileId}
+              onChange={(e) => setSelectedBusinessProfileId(e.target.value)}
+            >
+              {businessProfiles.map((profile) => (
+                <MenuItem key={profile.id} value={profile.id}>
+                  {profile.businessName || 'Unnamed Business'} {profile.isDefault ? '(Default)' : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant='outlined' onClick={importSelectedBusinessProfile} disabled={!selectedBusinessProfileId}>
+            Import Profile
+          </Button>
+        </Stack>
+        {businessProfilesError && <FormHelperText error>{businessProfilesError}</FormHelperText>}
+      </Grid>
       <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='Business name' value={data.businessName} onChange={e => setData({ ...data, businessName: e.target.value })} sx={fieldSx} /></Grid>
       <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth required label='TRN' value={data.trn} onChange={e => setData({ ...data, trn: e.target.value.replace(/[^0-9]/g, '') })} sx={fieldSx} /></Grid>
       <Grid size={{ xs: 12, md: 6 }}>

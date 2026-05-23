@@ -52,6 +52,14 @@ function mapRecord(row) {
   };
 }
 
+async function validateBusinessProfileAccess(req, businessProfileId) {
+  if (!businessProfileId) return true;
+  if (req.user.role === 'superadmin') return true;
+
+  const result = await query('SELECT id FROM business_profiles WHERE id = $1 AND user_id = $2 LIMIT 1', [businessProfileId, req.user.id]);
+  return Boolean(result.rowCount);
+}
+
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
@@ -140,6 +148,12 @@ router.post('/', async (req, res) => {
   }
 
   const p = parsed.data;
+  if (p.businessProfileId) {
+    const hasAccess = await validateBusinessProfileAccess(req, p.businessProfileId);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Invalid business profile access' });
+    }
+  }
   const payload = p.payload || req.body || {};
   const taxAmount = typeof p.taxAmount === 'number' ? p.taxAmount : toNumber(payload?.result?.taxPayable ?? payload?.taxPayable);
 
@@ -187,6 +201,12 @@ router.put('/:id', async (req, res) => {
   }
 
   const p = parsed.data;
+  if (p.businessProfileId) {
+    const hasAccess = await validateBusinessProfileAccess(req, p.businessProfileId);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Invalid business profile access' });
+    }
+  }
   const payload = typeof p.payload !== 'undefined' ? p.payload : row.payload || {};
   const resolvedTaxAmount = typeof p.taxAmount === 'number'
     ? p.taxAmount
