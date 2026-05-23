@@ -5,6 +5,7 @@ const createRecordSchema = z.object({
   taxType: z.enum(['VAT', 'CORPORATE']),
   businessProfileId: z.string().uuid().optional().nullable(),
   periodType: z.string().optional().nullable(),
+  status: z.enum(['draft', 'final']).optional().default('draft'),
   periodStart: z.string().datetime().optional().nullable(),
   periodEnd: z.string().datetime().optional().nullable(),
   inputPayload: z.record(z.any()),
@@ -14,6 +15,7 @@ const createRecordSchema = z.object({
 const updateRecordSchema = z.object({
   businessProfileId: z.string().uuid().optional().nullable(),
   periodType: z.string().optional().nullable(),
+  status: z.enum(['draft', 'final']).optional(),
   periodStart: z.string().datetime().optional().nullable(),
   periodEnd: z.string().datetime().optional().nullable(),
   inputPayload: z.record(z.any()).optional(),
@@ -27,9 +29,9 @@ function toNumber(value) {
 
 export async function createTaxRecord(req, res) {
   const parsed = createRecordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid payload' });
+  if (!parsed.success) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'Invalid payload' });
 
-  const { taxType, businessProfileId, periodType, periodStart, periodEnd, inputPayload, resultPayload } = parsed.data;
+  const { taxType, businessProfileId, periodType, status, periodStart, periodEnd, inputPayload, resultPayload } = parsed.data;
 
   if (businessProfileId) {
     const profileAccess = await query('SELECT id FROM business_profiles WHERE id = $1 AND user_id = $2 LIMIT 1', [businessProfileId, req.user.id]);
@@ -52,14 +54,14 @@ export async function createTaxRecord(req, res) {
       `INSERT INTO vat_records (
         user_id, business_profile_id, period_type, period_label, period_start, period_end,
         filing_period_start, filing_period_end, taxable_sales, output_vat, taxable_purchases, input_vat,
-        expenses, adjustment_vat, payable_vat, refundable_vat, vat_payable, vat_refundable,
+        expenses, adjustment_vat, payable_vat, refundable_vat, vat_payable, vat_refundable, status,
         sales_total, purchase_total, expenses_total, taxable_amount, payload, updated_at
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,
         $5,$6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$13,$14,
-        $7,$9,$11,$7,$15,NOW()
+        $11,$12,$13,$14,$13,$14,$15,
+        $7,$9,$11,$7,$16,NOW()
       )`,
       [
         req.user.id,
@@ -76,6 +78,7 @@ export async function createTaxRecord(req, res) {
         toNumber(resultPayload?.adjustments ?? inputPayload?.previousAdjustment),
         payableVat,
         refundableVat,
+        status,
         inputPayload,
       ]
     );
@@ -88,12 +91,12 @@ export async function createTaxRecord(req, res) {
       `INSERT INTO corporate_tax_records (
         user_id, business_profile_id, period_label, period_start, period_end,
         filing_period_start, filing_period_end, revenue, expenses, taxable_profit, tax_amount,
-        sales_total, expenses_total, taxable_amount, corporate_tax_estimate, payload, updated_at
+        sales_total, expenses_total, taxable_amount, corporate_tax_estimate, status, payload, updated_at
       )
       VALUES (
         $1,$2,$3,$4,$5,
         $4,$5,$6,$7,$8,$9,
-        $6,$7,$8,$9,$10,NOW()
+        $6,$7,$8,$9,$10,$11,NOW()
       )`,
       [
         req.user.id,
@@ -105,6 +108,7 @@ export async function createTaxRecord(req, res) {
         totalExpenses,
         taxableIncome,
         taxPayable,
+        status,
         inputPayload,
       ]
     );
@@ -121,18 +125,26 @@ export async function listTaxRecords(req, res) {
 export async function getTaxRecord(req, res) {
   const rows = await query('SELECT * FROM tax_records WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
   const record = rows.rows[0];
-  if (!record) return res.status(404).json({ success: false, message: 'Record not found' });
+  if (!record) return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Record not found' });
   return res.json({ success: true, data: { record } });
 }
 
 export async function updateTaxRecord(req, res) {
   const parsed = updateRecordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid payload' });
+  if (!parsed.success) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'Invalid payload' });
 
   const existingRows = await query('SELECT id FROM tax_records WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
-  if (!existingRows.rows[0]) return res.status(404).json({ success: false, message: 'Record not found' });
+  if (!existingRows.rows[0]) return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Record not found' });
 
-  const { periodStart, periodEnd, inputPayload, resultPayload } = parsed.data;
+  const { businessProfileId, status, periodStart, periodEnd, inputPayload, resultPayload } = parsed.data;
+
+  if (businessProfileId) {
+    const profileAccess = await query('SELECT id FROM business_profiles WHERE id = $1 AND user_id = $2 LIMIT 1', [businessProfileId, req.user.id]);
+    if (!profileAccess.rowCount) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Invalid business profile access' });
+    }
+  }
+
   const updated = await query(
     `UPDATE tax_records
      SET filing_period_start = COALESCE($1, filing_period_start),
@@ -144,11 +156,12 @@ export async function updateTaxRecord(req, res) {
      RETURNING *`,
     [periodStart ? new Date(periodStart) : null, periodEnd ? new Date(periodEnd) : null, inputPayload ?? null, resultPayload ?? null, req.params.id, req.user.id]
   );
+
   return res.json({ success: true, data: { record: updated.rows[0] } });
 }
 
 export async function deleteTaxRecord(req, res) {
   const deleted = await query('DELETE FROM tax_records WHERE id = $1 AND user_id = $2 RETURNING id', [req.params.id, req.user.id]);
-  if (!deleted.rows[0]) return res.status(404).json({ success: false, message: 'Record not found' });
+  if (!deleted.rows[0]) return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Record not found' });
   return res.json({ success: true, data: { id: deleted.rows[0].id } });
 }

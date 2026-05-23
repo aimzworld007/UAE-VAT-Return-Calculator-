@@ -5,6 +5,10 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Grid,
   LinearProgress,
   MenuItem,
@@ -77,6 +81,7 @@ export function BusinessProfilePage() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [notice, setNotice] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
   const loadProfiles = React.useCallback(async () => {
     setLoading(true);
@@ -173,7 +178,6 @@ export function BusinessProfilePage() {
 
   const onDelete = async () => {
     if (!selectedId || selectedId === 'new') return;
-    if (!window.confirm('Delete this business profile?')) return;
 
     setSaving(true);
     setNotice(null);
@@ -240,7 +244,7 @@ export function BusinessProfilePage() {
                   <Button variant='outlined' onClick={onMakeDefault} disabled={selectedId === 'new' || saving}>
                     Set Default
                   </Button>
-                  <Button variant='outlined' color='error' onClick={onDelete} disabled={selectedId === 'new' || saving}>
+                  <Button variant='outlined' color='error' onClick={() => setDeleteConfirmOpen(true)} disabled={selectedId === 'new' || saving}>
                     Delete
                   </Button>
                 </Stack>
@@ -350,6 +354,26 @@ export function BusinessProfilePage() {
           </Card>
         )}
       </Stack>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Delete business profile</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this business profile?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button
+            color='error'
+            variant='contained'
+            onClick={async () => {
+              setDeleteConfirmOpen(false);
+              await onDelete();
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </DashboardLayout>
   );
 }

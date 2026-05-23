@@ -16,6 +16,11 @@ const initialForm = {
 export function RemindersPage() {
   const [items, setItems] = React.useState<any[]>([]);
   const [upcoming, setUpcoming] = React.useState<any[]>([]);
+  const [search, setSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<'pending' | 'completed' | ''>('');
+  const [typeFilter, setTypeFilter] = React.useState<'VAT' | 'Corporate Tax' | 'Other' | ''>('');
+  const [page, setPage] = React.useState(1);
+  const [meta, setMeta] = React.useState({ page: 1, limit: 20, total: 0 });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -28,19 +33,26 @@ export function RemindersPage() {
     setLoading(true);
     setError('');
     try {
-      const [allReminders, upcomingReminders] = await Promise.all([listReminders(), listUpcomingReminders()]);
-      setItems(allReminders);
+      const [allReminders, upcomingReminders] = await Promise.all([
+        listReminders({ page, limit: 20, search, status: statusFilter, type: typeFilter }),
+        listUpcomingReminders(),
+      ]);
+      setItems(allReminders.items || []);
+      setMeta(allReminders.meta || { page: 1, limit: 20, total: 0 });
       setUpcoming(upcomingReminders);
     } catch (e: any) {
       setError(e?.message || 'Unable to load reminders');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, search, statusFilter, typeFilter]);
 
   React.useEffect(() => {
     load();
   }, [load]);
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, typeFilter]);
 
   const resetForm = () => {
     setForm(initialForm);
@@ -165,6 +177,20 @@ export function RemindersPage() {
           <Grid item xs={12} md={7}>
             <Card variant='outlined'>
               <CardContent>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 1.2 }}>
+                  <TextField label='Search reminders' value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <TextField select label='Status' value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} sx={{ minWidth: 140 }}>
+                    <MenuItem value=''>All</MenuItem>
+                    <MenuItem value='pending'>Pending</MenuItem>
+                    <MenuItem value='completed'>Completed</MenuItem>
+                  </TextField>
+                  <TextField select label='Type' value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} sx={{ minWidth: 160 }}>
+                    <MenuItem value=''>All</MenuItem>
+                    <MenuItem value='VAT'>VAT</MenuItem>
+                    <MenuItem value='Corporate Tax'>Corporate Tax</MenuItem>
+                    <MenuItem value='Other'>Other</MenuItem>
+                  </TextField>
+                </Stack>
                 <Typography variant='h6' sx={{ mb: 1.5 }}>Upcoming Reminders</Typography>
                 {!upcoming.length && <EmptyState message='No upcoming reminders.' />}
                 <Stack spacing={1.1}>
@@ -187,6 +213,24 @@ export function RemindersPage() {
                       </CardContent>
                     </Card>
                   ))}
+                </Stack>
+                <Stack direction='row' justifyContent='space-between' alignItems='center' sx={{ mt: 1.5 }}>
+                  <Typography variant='body2' color='text.secondary'>
+                    Page {meta.page || page} • {meta.total || 0} reminders
+                  </Typography>
+                  <Stack direction='row' spacing={1}>
+                    <Button size='small' variant='outlined' disabled={(meta.page || page) <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                      Previous
+                    </Button>
+                    <Button
+                      size='small'
+                      variant='outlined'
+                      disabled={(meta.page || page) >= Math.max(1, Math.ceil((meta.total || 0) / (meta.limit || 20)))}
+                      onClick={() => setPage((prev) => prev + 1)}
+                    >
+                      Next
+                    </Button>
+                  </Stack>
                 </Stack>
               </CardContent>
             </Card>

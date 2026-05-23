@@ -32,7 +32,7 @@ import { Building2, CheckCircle2, ClipboardList, Eye, Upload } from 'lucide-reac
 import { ExportActions, money } from './components/common.jsx';
 import { CorporateTaxReport } from './components/CorporateTaxReport';
 import { calculateCorporateTax } from './lib/corporateTaxCalculator';
-import { downloadPdfReport } from './lib/pdfGenerator';
+import { downloadCorporateTaxPdf } from './services/corporateTaxPdfApi';
 import { createBusinessProfile, listBusinessProfiles, updateBusinessProfile } from '../business/services/businessProfileApi';
 
 const steps = [
@@ -50,7 +50,11 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
   const [selectedBusinessProfileId, setSelectedBusinessProfileId] = React.useState('');
   const [businessProfilesError, setBusinessProfilesError] = React.useState('');
   const [businessProfileStatus, setBusinessProfileStatus] = React.useState('');
+  const [downloadError, setDownloadError] = React.useState('');
+  const [downloadLoading, setDownloadLoading] = React.useState(false);
   const [autoSaveProfileEnabled, setAutoSaveProfileEnabled] = React.useState(true);
+  const [recordSaveStatus, setRecordSaveStatus] = React.useState('');
+  const [recordSaving, setRecordSaving] = React.useState(false);
   const saveTimerRef = React.useRef(null);
   const lastSavedFingerprintRef = React.useRef('');
   const result = calculateCorporateTax(data);
@@ -112,29 +116,36 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
         return null;
       }
 
-      const payload = buildBusinessProfilePayload();
-      const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
-      const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
-      if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
+      try {
+        const payload = buildBusinessProfilePayload();
+        const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
+        const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
+        if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
 
-      let saved;
-      if (targetId) {
-        saved = await updateBusinessProfile(targetId, payload);
-      } else {
-        saved = await createBusinessProfile(payload);
+        let saved;
+        if (targetId) {
+          saved = await updateBusinessProfile(targetId, payload);
+        } else {
+          saved = await createBusinessProfile(payload);
+        }
+
+        if (!saved?.id) return null;
+
+        setBusinessProfiles((prev) => {
+          const next = prev.filter((p) => p.id !== saved.id);
+          return [saved, ...next];
+        });
+        setSelectedBusinessProfileId(saved.id);
+        setData((prev) => ({ ...prev, businessProfileId: saved.id }));
+        lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
+        setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
+        return saved;
+      } catch (error) {
+        if (!silent) {
+          setBusinessProfileStatus(error?.message || 'Unable to save profile right now.');
+        }
+        return null;
       }
-
-      if (!saved?.id) return null;
-
-      setBusinessProfiles((prev) => {
-        const next = prev.filter((p) => p.id !== saved.id);
-        return [saved, ...next];
-      });
-      setSelectedBusinessProfileId(saved.id);
-      setData((prev) => ({ ...prev, businessProfileId: saved.id }));
-      lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
-      setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
-      return saved;
     },
     [buildBusinessProfilePayload, canSaveBusinessProfile, selectedBusinessProfileId, setData]
   );
@@ -202,6 +213,23 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
     else setStep(prevStep);
   };
 
+  const saveRecord = React.useCallback(
+    async (status) => {
+      if (!onSave) return;
+      setRecordSaving(true);
+      setRecordSaveStatus('');
+      try {
+        await onSave(status);
+        setRecordSaveStatus(status === 'final' ? 'Final corporate tax record saved successfully.' : 'Draft corporate tax record saved successfully.');
+      } catch {
+        setRecordSaveStatus('Unable to save record right now.');
+      } finally {
+        setRecordSaving(false);
+      }
+    },
+    [onSave]
+  );
+
   const NumberField = ({ label, keyName, helperText }) => (
     <Grid size={{ xs: 12, md: 4 }}>
       <TextField
@@ -262,6 +290,8 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
 
     <Card className='businessCard' sx={{ borderRadius: '14px', border: '1px solid #e5e7eb', bgcolor: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.05)' }}>
       <CardContent sx={{ p: { xs: 1.5, md: 2.2 } }}>
+        {downloadError && <Alert severity='error' sx={{ mb: 1.4 }}>{downloadError}</Alert>}
+        {recordSaveStatus && <Alert severity={recordSaveStatus.toLowerCase().includes('unable') ? 'error' : 'success'} sx={{ mb: 1.4 }}>{recordSaveStatus}</Alert>}
         {step === 1 && <Box>
           <Stack direction='row' spacing={1.5} alignItems='center' sx={{ mb: 2.5 }}>
             <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#eaf1ff', color: 'primary.main', display: 'grid', placeItems: 'center' }}><BusinessOutlinedIcon /></Box>
@@ -369,20 +399,34 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
           <CorporateTaxReport data={data} />
           <Box sx={{ mt: 2 }}>
             <ExportActions
-              onSave={onSave}
+              onBack={back}
+              onSave={() => saveRecord('final')}
+              saveLabel='Save Final'
+              saveDisabled={recordSaving}
               onReset={onReset}
               onPrint={() => window.print()}
+              pdfLoading={downloadLoading}
               onPdf={async () => {
                 try {
-                  await downloadPdfReport({
-                    reportId: 'corporate-tax-report',
-                    reportType: 'corporate-tax',
+                  setDownloadError('');
+                  setDownloadLoading(true);
+                  await downloadCorporateTaxPdf({
                     companyName: data.companyName,
-                    taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart}_to_${data.financialYearEnd}` : 'period'
+                    trn: data.taxRegistrationNumber,
+                    businessActivity: data.businessActivity,
+                    taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart} to ${data.financialYearEnd}` : 'Saved Period',
+                    summary: {
+                      revenue: result.totalRevenue,
+                      expenses: result.totalExpenses,
+                      taxableProfit: result.taxableIncome,
+                      taxAmount: result.taxPayable,
+                    },
                   });
                 } catch (error) {
                   console.error('Corporate tax PDF generation failed', error);
-                  window.alert('Unable to download Corporate Tax PDF right now. Please try again or use Print.');
+                  setDownloadError('Unable to download Corporate Tax PDF right now. Please try again or use Print.');
+                } finally {
+                  setDownloadLoading(false);
                 }
               }}
             />
@@ -393,7 +437,8 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
 
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2, p: { xs: 1.5, md: 2 }, borderRadius: 3, border: '1px solid #dbe6f3', bgcolor: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.05)' }}>
       <Button variant='outlined' onClick={back} disabled={step === 1} startIcon={<ArrowBackOutlinedIcon />}>Back</Button>
-      <Button className='primary-gradient-btn' onClick={next} disabled={step === 4 || (step === 1 && missingRequired)} endIcon={<ArrowForwardOutlinedIcon />}>Continue</Button>
+      {step < 4 ? <Button variant='outlined' onClick={() => saveRecord('draft')} disabled={recordSaving}>Save Draft</Button> : null}
+      <Button className='primary-gradient-btn' onClick={next} disabled={step === 4 || (step === 1 && missingRequired) || recordSaving} endIcon={<ArrowForwardOutlinedIcon />}>Continue</Button>
     </Stack>
   </div>;
 }

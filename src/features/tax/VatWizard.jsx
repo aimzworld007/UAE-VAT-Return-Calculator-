@@ -70,6 +70,8 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
   const [autoSaveProfileEnabled, setAutoSaveProfileEnabled] = React.useState(true);
   const saveTimerRef = React.useRef(null);
   const lastSavedFingerprintRef = React.useRef('');
+  const [recordSaveStatus, setRecordSaveStatus] = React.useState('');
+  const [recordSaving, setRecordSaving] = React.useState(false);
   const result = calculateVat(data);
   const reqErr = validateBusinessName(data.businessName) || validateTrn(data.trn) || validateRequired(data.businessLocationEmirate, 'Business location emirate') || validateVatPeriodSelection(data);
 
@@ -131,29 +133,36 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
         return null;
       }
 
-      const payload = buildBusinessProfilePayload();
-      const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
-      const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
-      if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
+      try {
+        const payload = buildBusinessProfilePayload();
+        const targetId = !forceNew && selectedBusinessProfileId && selectedBusinessProfileId !== 'new' ? selectedBusinessProfileId : null;
+        const fingerprint = JSON.stringify({ targetId: targetId || 'new', payload });
+        if (silent && fingerprint === lastSavedFingerprintRef.current) return null;
 
-      let saved;
-      if (targetId) {
-        saved = await updateBusinessProfile(targetId, payload);
-      } else {
-        saved = await createBusinessProfile(payload);
+        let saved;
+        if (targetId) {
+          saved = await updateBusinessProfile(targetId, payload);
+        } else {
+          saved = await createBusinessProfile(payload);
+        }
+
+        if (!saved?.id) return null;
+
+        setBusinessProfiles((prev) => {
+          const next = prev.filter((p) => p.id !== saved.id);
+          return [saved, ...next];
+        });
+        setSelectedBusinessProfileId(saved.id);
+        setData((prev) => ({ ...prev, businessProfileId: saved.id }));
+        lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
+        setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
+        return saved;
+      } catch (error) {
+        if (!silent) {
+          setBusinessProfileStatus(error?.message || 'Unable to save profile right now.');
+        }
+        return null;
       }
-
-      if (!saved?.id) return null;
-
-      setBusinessProfiles((prev) => {
-        const next = prev.filter((p) => p.id !== saved.id);
-        return [saved, ...next];
-      });
-      setSelectedBusinessProfileId(saved.id);
-      setData((prev) => ({ ...prev, businessProfileId: saved.id }));
-      lastSavedFingerprintRef.current = JSON.stringify({ targetId: saved.id, payload });
-      setBusinessProfileStatus(silent ? 'Business profile auto-saved.' : forceNew ? 'Business profile saved as new.' : 'Business profile saved.');
-      return saved;
     },
     [buildBusinessProfilePayload, canSaveBusinessProfile, selectedBusinessProfileId, setData]
   );
@@ -267,6 +276,19 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
       setDownloadLoading(false);
     }
   };
+  const saveRecord = async (status) => {
+    if (!onSave) return;
+    setRecordSaving(true);
+    setRecordSaveStatus('');
+    try {
+      await onSave(status);
+      setRecordSaveStatus(status === 'final' ? 'Final record saved successfully.' : 'Draft saved successfully.');
+    } catch (error) {
+      setRecordSaveStatus('Unable to save record right now.');
+    } finally {
+      setRecordSaving(false);
+    }
+  };
   const continueDisabled = (step === 1 && Boolean(reqErr)) || step === 4;
   const stepMeta = steps.map((stepItem, i) => {
     const stepNumber = i + 1;
@@ -313,6 +335,7 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
     </Card>
     <Card className='businessCard' sx={{ borderRadius: '14px', border: '1px solid #e5e7eb', bgcolor: '#fff', boxShadow: '0 8px 24px rgba(15,23,42,0.05)' }}>
       <CardContent sx={{ p: { xs: 1.5, md: 2.2 } }}>
+    {recordSaveStatus && <Alert severity={recordSaveStatus.toLowerCase().includes('unable') ? 'error' : 'success'} sx={{ mb: 1.2 }}>{recordSaveStatus}</Alert>}
     {step === 1 && <Box>
       <Stack direction='row' spacing={1.5} alignItems='center' sx={{ mb: 2.5 }}>
         <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#eaf1ff', color: 'primary.main', display: 'grid', placeItems: 'center' }}>
@@ -539,7 +562,12 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
               <Button className='wizardNavBtn' fullWidth variant='outlined' startIcon={<ArrowBackOutlinedIcon />} onClick={back} disabled={step === 1}>Back</Button>
             </Box>
             <Box sx={{ width: { xs: '100%', md: '50%' }, display: 'flex', justifyContent: { xs: 'stretch', md: 'flex-end' } }}>
-              <Button fullWidth className='primary-gradient-btn wizardNavBtn' endIcon={<ArrowForwardOutlinedIcon />} onClick={next} disabled={continueDisabled}>Continue</Button>
+              <Stack direction='row' spacing={1} sx={{ width: '100%' }}>
+                <Button fullWidth variant='outlined' onClick={() => saveRecord('draft')} disabled={recordSaving}>
+                  {recordSaving ? 'Saving…' : 'Save Draft'}
+                </Button>
+                <Button fullWidth className='primary-gradient-btn wizardNavBtn' endIcon={<ArrowForwardOutlinedIcon />} onClick={next} disabled={continueDisabled}>Continue</Button>
+              </Stack>
             </Box>
           </Box>
         </div>
@@ -548,8 +576,10 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
     {step === 4 && <div className='export-action-bar'>
       <Button className='wizardNavBtn export-action-back' variant='outlined' startIcon={<ArrowBackOutlinedIcon />} onClick={back}>Back</Button>
       <div className='export-action-right'>
-        <Button variant='outlined' startIcon={<SaveOutlinedIcon />} onClick={onSave}>Save Record</Button>
         <Button className='danger-soft-btn' variant='outlined' onClick={onReset}>Reset</Button>
+        <Button variant='outlined' startIcon={<SaveOutlinedIcon />} onClick={() => saveRecord('final')} disabled={recordSaving}>
+          {recordSaving ? 'Saving…' : 'Save Final'}
+        </Button>
         <Button variant='outlined' startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>Print</Button>
         <Button className='primary-gradient-btn' variant='contained' startIcon={<DownloadOutlinedIcon />} onClick={handleDownloadPdf} disabled={downloadLoading}>{downloadLoading ? 'Downloading PDF…' : 'Download PDF'}</Button>
       </div>

@@ -197,11 +197,12 @@ function RoutedModules() {
   const vatHistoryMatch = pathname.match(/^\/vat\/history\/([^/]+)$/);
   const taxHistoryMatch = pathname.match(/^\/tax\/history\/([^/]+)$/);
 
-  const handleSaveVatRecord = React.useCallback(async () => {
+  const handleSaveVatRecord = React.useCallback(async (status: 'draft' | 'final' = 'draft') => {
     await createTaxRecord({
       taxType: 'VAT',
       businessProfileId: vat.businessProfileId || null,
       periodType: vat.filingFrequency || null,
+      status,
       periodStart: toIsoOrNull(vat.taxPeriodStart),
       periodEnd: toIsoOrNull(vat.taxPeriodEnd),
       inputPayload: vat,
@@ -209,10 +210,11 @@ function RoutedModules() {
     });
   }, [vat]);
 
-  const handleSaveTaxRecord = React.useCallback(async () => {
+  const handleSaveTaxRecord = React.useCallback(async (status: 'draft' | 'final' = 'draft') => {
     await createTaxRecord({
       taxType: 'CORPORATE',
       businessProfileId: ct.businessProfileId || null,
+      status,
       periodStart: toIsoOrNull(ct.financialYearStart),
       periodEnd: toIsoOrNull(ct.financialYearEnd),
       inputPayload: ct,

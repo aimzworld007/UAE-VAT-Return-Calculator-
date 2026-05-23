@@ -49,11 +49,52 @@ function canAccessReminder(req, reminder) {
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
-  const where = req.user.role === 'superadmin' ? '' : 'WHERE user_id = $1';
-  const params = req.user.role === 'superadmin' ? [] : [req.user.id];
-  const result = await query(`SELECT * FROM reminders ${where} ORDER BY due_date ASC, created_at DESC`, params);
+  const page = Math.max(1, Number(req.query.page || 1));
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+  const offset = (page - 1) * limit;
+  const search = String(req.query.search || '').trim();
+  const status = String(req.query.status || '').trim();
+  const type = String(req.query.type || '').trim();
 
-  return res.json({ success: true, data: result.rows.map(mapReminder) });
+  const params = [];
+  const where = [];
+  if (req.user.role !== 'superadmin') {
+    params.push(req.user.id);
+    where.push(`user_id = $${params.length}`);
+  }
+  if (search) {
+    params.push(`%${search}%`);
+    where.push(`(title ILIKE $${params.length} OR COALESCE(type, '') ILIKE $${params.length})`);
+  }
+  if (status) {
+    params.push(status);
+    where.push(`status = $${params.length}`);
+  }
+  if (type) {
+    params.push(type);
+    where.push(`type = $${params.length}`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const countResult = await query(`SELECT COUNT(*)::int AS count FROM reminders ${whereSql}`, params);
+
+  params.push(limit, offset);
+  const result = await query(
+    `SELECT * FROM reminders ${whereSql}
+     ORDER BY due_date ASC, created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+
+  return res.json({
+    success: true,
+    data: result.rows.map(mapReminder),
+    meta: {
+      page,
+      limit,
+      total: countResult.rows[0]?.count || 0,
+    },
+  });
 });
 
 router.get('/upcoming', async (req, res) => {

@@ -161,16 +161,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistUser]);
 
   const updateProfile = React.useCallback(async (next: Pick<AuthUser, 'name' | 'fullName' | 'email' | 'phone' | 'address'>) => {
+    const normalizeOptional = (value?: string | null) => {
+      if (value == null) return undefined;
+      const trimmed = String(value).trim();
+      return trimmed.length ? trimmed : undefined;
+    };
+
+    const payload = {
+      name: normalizeOptional(next.name || next.fullName),
+      fullName: normalizeOptional(next.fullName || next.name),
+      email: normalizeOptional(next.email),
+      phone: normalizeOptional(next.phone) ?? null,
+      address: normalizeOptional(next.address) ?? null,
+    };
+
     try {
       const response = await apiClient<any>('/api/users/me', {
         method: 'PATCH',
-        body: JSON.stringify({
-          name: next.name || next.fullName,
-          fullName: next.fullName || next.name,
-          email: next.email,
-          phone: next.phone,
-          address: next.address,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const updated = readUserFromResponse(response);

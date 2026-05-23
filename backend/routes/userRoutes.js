@@ -7,12 +7,25 @@ import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 
+const optionalTrimmed = z.preprocess((value) => {
+  if (value == null) return undefined;
+  const text = String(value).trim();
+  return text.length ? text : undefined;
+}, z.string().optional());
+
+const optionalTrimmedNullable = z.preprocess((value) => {
+  if (typeof value === 'undefined') return undefined;
+  if (value === null) return null;
+  const text = String(value).trim();
+  return text.length ? text : null;
+}, z.string().nullable().optional());
+
 const updateProfileSchema = z.object({
-  name: z.string().trim().min(2).max(120).optional(),
-  fullName: z.string().trim().min(2).max(120).optional(),
-  email: z.string().trim().email().optional(),
-  phone: z.string().trim().max(50).optional().nullable(),
-  address: z.string().trim().max(500).optional().nullable(),
+  name: optionalTrimmed.pipe(z.string().min(2).max(120).optional()),
+  fullName: optionalTrimmed.pipe(z.string().min(2).max(120).optional()),
+  email: optionalTrimmed.pipe(z.string().email().optional()),
+  phone: optionalTrimmedNullable.pipe(z.string().max(50).nullable().optional()),
+  address: optionalTrimmedNullable.pipe(z.string().max(500).nullable().optional()),
 });
 
 const updatePasswordSchema = z.object({

@@ -6,6 +6,13 @@ import { logAudit } from '../services/auditService.js';
 
 const router = Router();
 
+const optionalTrimmedNullable = z.preprocess((value) => {
+  if (typeof value === 'undefined') return undefined;
+  if (value === null) return null;
+  const text = String(value).trim();
+  return text.length ? text : null;
+}, z.string().nullable());
+
 const businessProfileSchema = z.object({
   businessName: z.string().trim().min(2).max(180),
   trn: z
@@ -14,15 +21,15 @@ const businessProfileSchema = z.object({
     .regex(/^[0-9]{5,20}$/)
     .optional()
     .or(z.literal('').transform(() => undefined)),
-  address: z.string().trim().max(500).optional().nullable(),
-  phone: z.string().trim().max(50).optional().nullable(),
-  email: z.string().trim().email().optional().nullable(),
-  activity: z.string().trim().max(200).optional().nullable(),
-  emirate: z.string().trim().max(100).optional().nullable(),
-  vatFilingFrequency: z.string().trim().max(50).optional().nullable(),
-  corporateTaxYearStart: z.string().trim().optional().nullable(),
-  corporateTaxYearEnd: z.string().trim().optional().nullable(),
-  defaultVatPricingMode: z.string().trim().max(50).optional().nullable(),
+  address: optionalTrimmedNullable.pipe(z.string().max(500).nullable()).optional(),
+  phone: optionalTrimmedNullable.pipe(z.string().max(50).nullable()).optional(),
+  email: optionalTrimmedNullable.pipe(z.string().email().nullable()).optional(),
+  activity: optionalTrimmedNullable.pipe(z.string().max(200).nullable()).optional(),
+  emirate: optionalTrimmedNullable.pipe(z.string().max(100).nullable()).optional(),
+  vatFilingFrequency: optionalTrimmedNullable.pipe(z.string().max(50).nullable()).optional(),
+  corporateTaxYearStart: optionalTrimmedNullable.optional(),
+  corporateTaxYearEnd: optionalTrimmedNullable.optional(),
+  defaultVatPricingMode: optionalTrimmedNullable.pipe(z.string().max(50).nullable()).optional(),
   isDefault: z.boolean().optional(),
 });
 

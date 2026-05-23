@@ -4,6 +4,7 @@ export async function createTaxRecord(payload: {
   taxType: 'VAT' | 'CORPORATE';
   businessProfileId?: string | null;
   periodType?: string | null;
+  status?: 'draft' | 'final';
   periodStart?: string | null;
   periodEnd?: string | null;
   inputPayload: Record<string, unknown>;

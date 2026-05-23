@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Stack } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { HistoryTabs } from './components/HistoryTabs';
 import { HistoryFilters } from './components/HistoryFilters';
@@ -14,23 +14,39 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
   const [tab, setTab] = React.useState<'vat' | 'tax'>(initialTab);
   const [records, setRecords] = React.useState<any[]>([]);
   const [query, setQuery] = React.useState('');
+  const [status, setStatus] = React.useState('');
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
   const [error, setError] = React.useState('');
   const [detail, setDetail] = React.useState<any>(null);
   const [downloadingId, setDownloadingId] = React.useState<string | number | null>(null);
+  const [page, setPage] = React.useState(1);
+  const [meta, setMeta] = React.useState({ page: 1, limit: 20, total: 0 });
+  const [deleteCandidateId, setDeleteCandidateId] = React.useState<string | number | null>(null);
 
   const load = React.useCallback(async () => {
     try {
       setError('');
-      const next = tab === 'vat' ? await listVatHistory() : await listCorporateTaxHistory();
-      setRecords(next);
+      const payload = {
+        page,
+        limit: 20,
+        search: query,
+        status,
+        startDate,
+        endDate,
+      };
+      const next = tab === 'vat' ? await listVatHistory(payload) : await listCorporateTaxHistory(payload);
+      setRecords(next.items || []);
+      setMeta(next.meta || { page: 1, limit: 20, total: 0 });
     } catch (e: any) {
       setError(e?.message || 'Unable to load history records.');
     }
-  }, [tab]);
+  }, [tab, page, query, status, startDate, endDate]);
 
   React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => { setPage(1); }, [tab, query, status, startDate, endDate]);
 
-  const filtered = records.filter((r) => `${r.period_label || ''} ${JSON.stringify(r.payload || {})}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = records;
 
   const onView = async (id: string | number) => {
     try {
@@ -41,11 +57,13 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
     }
   };
 
-  const onDelete = async (id: string | number) => {
-    if (!window.confirm('Delete this history record?')) return;
+  const onDelete = async () => {
+    const id = deleteCandidateId;
+    if (!id) return;
     try {
       if (tab === 'vat') await deleteVatHistoryRecord(id);
       else await deleteCorporateTaxHistoryRecord(id);
+      setDeleteCandidateId(null);
       await load();
     } catch (e: any) {
       setError(e?.message || 'Unable to delete record.');
@@ -74,5 +92,54 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
     }
   };
 
-  return <DashboardLayout><Stack spacing={2.2}><HistoryTabs value={tab} onChange={setTab} /><HistoryFilters query={query} onQueryChange={setQuery} />{error && <Alert severity='error'>{error}</Alert>}{tab === 'vat' ? <VatHistoryTable records={filtered} onView={onView} onDelete={onDelete} onDownload={onDownloadVat} downloadingId={downloadingId} /> : <CorporateTaxHistoryTable records={filtered} onView={onView} onDelete={onDelete} onDownload={onDownloadTax} downloadingId={downloadingId} />}<HistoryDetailDialog open={Boolean(detail)} record={detail} onClose={() => setDetail(null)} /></Stack></DashboardLayout>;
+  const totalPages = Math.max(1, Math.ceil((meta.total || 0) / (meta.limit || 20)));
+
+  return (
+    <DashboardLayout>
+      <Stack spacing={2.2}>
+        <HistoryTabs value={tab} onChange={setTab} />
+        <HistoryFilters
+          query={query}
+          onQueryChange={setQuery}
+          status={status}
+          onStatusChange={setStatus}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          endDate={endDate}
+          onEndDateChange={setEndDate}
+        />
+        {error && <Alert severity='error'>{error}</Alert>}
+        {tab === 'vat' ? (
+          <VatHistoryTable records={filtered} onView={onView} onDelete={(id) => setDeleteCandidateId(id)} onDownload={onDownloadVat} downloadingId={downloadingId} />
+        ) : (
+          <CorporateTaxHistoryTable records={filtered} onView={onView} onDelete={(id) => setDeleteCandidateId(id)} onDownload={onDownloadTax} downloadingId={downloadingId} />
+        )}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant='body2' color='text.secondary'>
+            Page {meta.page || page} of {totalPages} • {meta.total || 0} records
+          </Typography>
+          <Stack direction='row' spacing={1}>
+            <Button size='small' variant='outlined' disabled={(meta.page || page) <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+              Previous
+            </Button>
+            <Button size='small' variant='outlined' disabled={(meta.page || page) >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
+              Next
+            </Button>
+          </Stack>
+        </Box>
+        <HistoryDetailDialog open={Boolean(detail)} record={detail} onClose={() => setDetail(null)} />
+      </Stack>
+
+      <Dialog open={Boolean(deleteCandidateId)} onClose={() => setDeleteCandidateId(null)}>
+        <DialogTitle>Delete history record</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this record?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteCandidateId(null)}>Cancel</Button>
+          <Button color='error' variant='contained' onClick={onDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+    </DashboardLayout>
+  );
 }

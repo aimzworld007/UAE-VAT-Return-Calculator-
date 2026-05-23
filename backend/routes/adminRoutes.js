@@ -58,18 +58,39 @@ router.get('/summary', async (_req, res) => {
 
 router.get('/users', async (req, res) => {
   const search = String(req.query.search || '').trim();
+  const page = Math.max(1, Number(req.query.page || 1));
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit || 25)));
+  const offset = (page - 1) * limit;
   const params = [`%${search}%`];
 
+  const countResult = await query(
+    `SELECT COUNT(*)::int AS count
+     FROM users
+     WHERE ($1 = '%%' OR COALESCE(name, full_name, '') ILIKE $1 OR email::text ILIKE $1)`,
+    params
+  );
+
+  params.push(limit, offset);
   const result = await query(
     `SELECT id, name, full_name, email, role, created_at, updated_at
      FROM users
      WHERE ($1 = '%%' OR COALESCE(name, full_name, '') ILIKE $1 OR email::text ILIKE $1)
      ORDER BY created_at DESC
-     LIMIT 200`,
+     LIMIT $2 OFFSET $3`,
     params
   );
 
-  return res.json({ success: true, data: { users: result.rows.map(mapUser) } });
+  return res.json({
+    success: true,
+    data: {
+      users: result.rows.map(mapUser),
+    },
+    meta: {
+      page,
+      limit,
+      total: countResult.rows[0]?.count || 0,
+    },
+  });
 });
 
 router.get('/users/:id', async (req, res) => {

@@ -5,10 +5,17 @@ export async function fetchAdminSummary() {
   return response?.data;
 }
 
-export async function fetchAdminUsers(search = '') {
-  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+export async function fetchAdminUsers(search = '', page = 1, limit = 25) {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  const query = `?${params.toString()}`;
   const response = await apiGet(`/api/admin/users${query}`);
-  return response?.data?.users || [];
+  return {
+    items: response?.data?.users || [],
+    meta: response?.meta || { page, limit, total: 0 },
+  };
 }
 
 export async function updateUserRole(userId: string, role: 'user' | 'superadmin') {

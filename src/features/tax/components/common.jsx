@@ -26,4 +26,23 @@ export function WorkspaceHeader({ title: _title, progress = 0, centerContent }) 
   </CardContent></Card>;
 }
 export function FormSection({title,children}){return <Card className='premium-card' sx={{ borderRadius: '22px', border: '1px solid #dbe6f3', background: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, 0.07)' }}><CardContent sx={{ p: { xs: '18px', md: '32px' } }}><Typography variant='h6' sx={{mb:2, color:'#071832'}}>{title}</Typography>{children}</CardContent></Card>;}
-export function ExportActions({onSave,onReset,onPrint,onPdf,pdfLoading}){return <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} className='wizard-action-group wizard-action-group-right'><Button variant='outlined' onClick={onSave}>Save Draft</Button><Button className='danger-soft-btn' variant='outlined' onClick={onReset}>Reset</Button><Button variant='outlined' onClick={onPrint}>Print</Button><Button className='primary-gradient-btn' variant='contained' onClick={onPdf} disabled={pdfLoading}>{pdfLoading?'Generating PDF…':'Download PDF'}</Button></Stack>;}
+export function ExportActions({
+  onBack,
+  onSave,
+  onReset,
+  onPrint,
+  onPdf,
+  saveLabel = 'Save',
+  saveDisabled,
+  pdfLoading,
+}) {
+  return (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} className='wizard-action-group wizard-action-group-right'>
+      {onBack ? <Button variant='outlined' onClick={onBack}>Back</Button> : null}
+      <Button className='danger-soft-btn' variant='outlined' onClick={onReset}>Reset</Button>
+      <Button variant='outlined' onClick={onSave} disabled={saveDisabled}>{saveLabel}</Button>
+      <Button variant='outlined' onClick={onPrint}>Print</Button>
+      <Button className='primary-gradient-btn' variant='contained' onClick={onPdf} disabled={pdfLoading}>{pdfLoading ? 'Generating PDF…' : 'Download PDF'}</Button>
+    </Stack>
+  );
+}
