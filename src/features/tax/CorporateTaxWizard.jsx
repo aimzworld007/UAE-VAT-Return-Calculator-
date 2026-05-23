@@ -199,7 +199,24 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
         {step === 4 && <Box>
           <CorporateTaxReport data={data} />
           <Box sx={{ mt: 2 }}>
-            <ExportActions onSave={onSave} onReset={onReset} onPrint={() => window.print()} onPdf={() => downloadPdfReport({ reportId: 'corporate-tax-report', reportType: 'corporate-tax', companyName: data.companyName, taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart}_to_${data.financialYearEnd}` : 'period' })} />
+            <ExportActions
+              onSave={onSave}
+              onReset={onReset}
+              onPrint={() => window.print()}
+              onPdf={async () => {
+                try {
+                  await downloadPdfReport({
+                    reportId: 'corporate-tax-report',
+                    reportType: 'corporate-tax',
+                    companyName: data.companyName,
+                    taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart}_to_${data.financialYearEnd}` : 'period'
+                  });
+                } catch (error) {
+                  console.error('Corporate tax PDF generation failed', error);
+                  window.alert('Unable to download Corporate Tax PDF right now. Please try again or use Print.');
+                }
+              }}
+            />
           </Box>
         </Box>}
       </CardContent>

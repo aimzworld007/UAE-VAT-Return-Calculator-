@@ -1,8 +1,39 @@
+import { getStoredToken } from '../../../shared/utils/apiClient';
 import { createPdfBlobFromReport } from '../lib/pdfGenerator';
 
+function withAuthHeaders(headers = {}) {
+  const token = getStoredToken();
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+}
 
-export async function generateVatPdfBlob(_payload: any) {
-  return await createPdfBlobFromReport('vat201-report');
+async function requestServerVatPdf(payload: any): Promise<Blob> {
+  const response = await fetch('/api/vat/pdf', {
+    method: 'POST',
+    credentials: 'include',
+    headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload || {}),
+  });
+
+  if (!response.ok) {
+    let message = 'Failed to generate VAT PDF';
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json().catch(() => null);
+      message = data?.message || data?.error || message;
+    }
+    throw new Error(message);
+  }
+
+  return response.blob();
+}
+
+export async function generateVatPdfBlob(payload: any) {
+  try {
+    return await requestServerVatPdf(payload);
+  } catch (serverError) {
+    console.warn('Server VAT PDF failed, falling back to client-side renderer.', serverError);
+    return await createPdfBlobFromReport('vat201-report');
+  }
 }
 
 export function createPdfPreview(blob: Blob) {
@@ -34,4 +65,44 @@ export function downloadPdf(blob: Blob, filename: string) {
 export async function downloadVatPdf(payload: any) {
   const blob = await generateVatPdfBlob(payload);
   downloadPdf(blob, 'vat201-return-summary.pdf');
+}
+
+export function buildVatPdfPayloadFromHistoryRecord(record: any) {
+  const payload = record?.payload || {};
+  const periodStart = record?.periodStart || record?.period_start || payload?.taxPeriodStart || payload?.filing_period_start;
+  const periodEnd = record?.periodEnd || record?.period_end || payload?.taxPeriodEnd || payload?.filing_period_end;
+
+  const labelFromDates = periodStart && periodEnd ? `${String(periodStart).slice(0, 10)} to ${String(periodEnd).slice(0, 10)}` : 'Saved VAT Period';
+
+  const payable = Number(record?.payableVat ?? record?.vat_payable ?? 0) || 0;
+  const refundable = Number(record?.refundableVat ?? record?.vat_refundable ?? 0) || 0;
+  const netVat = payable - refundable;
+
+  return {
+    businessName: payload.businessName || payload.companyName || 'Saved VAT Record',
+    trn: payload.trn || payload.taxRegistrationNumber || 'N/A',
+    businessLocationEmirate: payload.businessLocationEmirate || 'N/A',
+    vatPeriod: record?.period_label || record?.periodType || labelFromDates,
+    preparedBy: 'UAE VAT & Tax Filing Assistant',
+    preparedDate: new Date().toISOString().slice(0, 10),
+    vatMode: payload.vatPricingMode === 'tax_inclusive' || payload.vatPricingMode === 'Tax Inclusive' ? 'Inclusive' : 'Exclusive',
+    summary: {
+      taxableSales: Number(record?.taxableSales ?? record?.taxable_sales ?? record?.sales_total ?? payload?.standardRatedSales ?? payload?.totalSales ?? 0) || 0,
+      outputVat: Number(record?.outputVat ?? record?.output_vat ?? payload?.outputVat ?? 0) || 0,
+      recoverableVat: Number(record?.inputVat ?? record?.input_vat ?? payload?.inputVat ?? 0) || 0,
+      zeroRated: Number(payload?.zeroRatedSales ?? 0) || 0,
+      exempt: Number(payload?.exemptSales ?? 0) || 0,
+      netVat,
+    },
+    boxes: Array.isArray(payload?.boxes) ? payload.boxes : [],
+    monthly: Array.isArray(payload?.monthlyEntries) ? payload.monthlyEntries : Array.isArray(payload?.monthly) ? payload.monthly : [],
+  };
+}
+
+export async function downloadVatHistoryPdf(record: any) {
+  const pdfPayload = buildVatPdfPayloadFromHistoryRecord(record);
+  const blob = await requestServerVatPdf(pdfPayload);
+  const safePeriod = String(pdfPayload.vatPeriod || 'period').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+  const safeBusiness = String(pdfPayload.businessName || 'vat-record').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+  downloadPdf(blob, `${safeBusiness}-${safePeriod}-vat-history.pdf`);
 }
