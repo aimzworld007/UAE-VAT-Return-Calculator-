@@ -26,6 +26,9 @@ const AdminDashboardPage = React.lazy(() => import('../pages/admin/AdminDashboar
 const AdminUsersPage = React.lazy(() => import('../pages/admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })));
 const AdminSmtpPage = React.lazy(() => import('../pages/admin/AdminSmtpPage').then((m) => ({ default: m.AdminSmtpPage })));
 const AdminAuditPage = React.lazy(() => import('../pages/admin/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })));
+const PrivacyPolicyPage = React.lazy(() => import('../pages/public/PublicInfoPages').then((m) => ({ default: m.PrivacyPolicyPage })));
+const TermsOfServicePage = React.lazy(() => import('../pages/public/PublicInfoPages').then((m) => ({ default: m.TermsOfServicePage })));
+const DocumentationPage = React.lazy(() => import('../pages/public/PublicInfoPages').then((m) => ({ default: m.DocumentationPage })));
 
 const mapVatStep = {
   details: 1,
@@ -226,6 +229,9 @@ function RoutedModules() {
 
   if (pathname.startsWith('/login')) return <GuestOnly><LoginPage /></GuestOnly>;
   if (pathname === '/register') return <GuestOnly><RegisterPage /></GuestOnly>;
+  if (pathname === '/privacy-policy') return <LazyPage><PrivacyPolicyPage /></LazyPage>;
+  if (pathname === '/terms' || pathname === '/terms-and-conditions') return <LazyPage><TermsOfServicePage /></LazyPage>;
+  if (pathname === '/documentation') return <LazyPage><DocumentationPage /></LazyPage>;
 
   if (pathname === '/dashboard') return <Guarded><LazyPage><DashboardPage /></LazyPage></Guarded>;
   if (pathname === '/profile') return <Guarded><LazyPage><ProfilePage /></LazyPage></Guarded>;
