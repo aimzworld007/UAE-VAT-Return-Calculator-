@@ -14,6 +14,30 @@ function toNumber(value: any) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function getPayload(record: any) {
+  return record?.payload && typeof record.payload === 'object' ? record.payload : {};
+}
+
+function sumPayloadMonthly(record: any, key: 'sales' | 'purchases' | 'expenses') {
+  const payload = getPayload(record);
+  const entries = Array.isArray(payload.monthlyEntries) ? payload.monthlyEntries : Array.isArray(payload.monthly) ? payload.monthly : [];
+  return entries.reduce((sum: number, row: any) => sum + toNumber(row?.[key]), 0);
+}
+
+function deriveSales(record: any) {
+  const direct = toNumber(record.sales_total ?? record.taxable_sales ?? record.taxableSales);
+  if (direct > 0) return direct;
+  const payload = getPayload(record);
+  return toNumber(payload.totalSales ?? payload.standardRatedSales ?? sumPayloadMonthly(record, 'sales'));
+}
+
+function derivePurchases(record: any) {
+  const direct = toNumber(record.purchase_total ?? record.taxable_purchases ?? record.taxablePurchases);
+  if (direct > 0) return direct;
+  const payload = getPayload(record);
+  return toNumber(payload.totalPurchases ?? payload.standardRatedPurchases ?? sumPayloadMonthly(record, 'purchases'));
+}
+
 export function VatHistoryTable({
   records,
   onView,
@@ -38,8 +62,8 @@ export function VatHistoryTable({
     return (
       <Stack spacing={1.2}>
         {records.map((record) => {
-          const sales = toNumber(record.sales_total ?? record.taxable_sales ?? record.taxableSales);
-          const purchases = toNumber(record.purchase_total ?? record.taxable_purchases ?? record.taxablePurchases);
+          const sales = deriveSales(record);
+          const purchases = derivePurchases(record);
           const payable = toNumber(record.vat_payable ?? record.payable_vat ?? record.payableVat);
           const refundable = toNumber(record.vat_refundable ?? record.refundable_vat ?? record.refundableVat);
           const netVat = payable - refundable;
@@ -86,8 +110,8 @@ export function VatHistoryTable({
         </TableHead>
         <TableBody>
           {records.map((record) => {
-            const sales = toNumber(record.sales_total ?? record.taxable_sales ?? record.taxableSales);
-            const purchases = toNumber(record.purchase_total ?? record.taxable_purchases ?? record.taxablePurchases);
+            const sales = deriveSales(record);
+            const purchases = derivePurchases(record);
             const payable = toNumber(record.vat_payable ?? record.payable_vat ?? record.payableVat);
             const refundable = toNumber(record.vat_refundable ?? record.refundable_vat ?? record.refundableVat);
 

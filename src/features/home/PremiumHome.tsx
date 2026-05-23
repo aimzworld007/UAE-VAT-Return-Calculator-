@@ -48,7 +48,12 @@ function Sidebar({ mobile = false, onClose }: { mobile?: boolean; onClose?: () =
   const isSuperadmin = String(user?.role || '').toLowerCase() === 'superadmin';
 
   const navItem = (label: string, to: string, icon?: React.ReactNode) => {
-    const active = pathname === to || pathname.startsWith(`${to}/`) || (to === '/vat/details' && pathname.startsWith('/vat/')) || (to === '/tax/details' && pathname.startsWith('/tax/'));
+    const active =
+      pathname === to ||
+      pathname.startsWith(`${to}/`) ||
+      (to === '/vat/details' && pathname.startsWith('/vat/')) ||
+      (to === '/tax/details' && pathname.startsWith('/tax/')) ||
+      (to === '/history' && (pathname.startsWith('/history') || pathname.startsWith('/vat/history') || pathname.startsWith('/tax/history')));
 
     return (
       <Button
@@ -95,8 +100,7 @@ function Sidebar({ mobile = false, onClose }: { mobile?: boolean; onClose?: () =
         {navItem('Corporate Tax', '/tax/details', <Building2 size={18} />)}
 
         <Typography sx={{ px: 1.2, pt: 1.8, pb: 0.8, color: '#64748B', fontSize: '0.74rem', fontWeight: 800, letterSpacing: '.06em' }}>MANAGEMENT</Typography>
-        {navItem('VAT History', '/vat/history', <FileSpreadsheet size={16} />)}
-        {navItem('Tax History', '/tax/history', <Building2 size={16} />)}
+        {navItem('History', '/history', <FileSpreadsheet size={16} />)}
         {navItem('Reminders', '/reminders', <Bell size={16} />)}
         {navItem('Business Profile', '/business-profile', <Building2 size={16} />)}
         {navItem('Profile', '/profile', <UserCircle2 size={16} />)}

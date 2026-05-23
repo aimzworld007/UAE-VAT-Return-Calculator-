@@ -56,7 +56,7 @@ const TASK_CARDS = [
     title: 'Filing History',
     description: 'View and manage saved VAT and corporate tax records.',
     icon: <History size={22} style={{ color: '#2563EB' }} />,
-    to: '/vat/history',
+    to: '/history',
   },
   {
     title: 'Reminders',
@@ -96,7 +96,7 @@ export function PublicLandingPage() {
       <List sx={{ p: 0 }}>
         <ListItem disablePadding><ListItemButton component={RouteLink} to='/vat/details'><ListItemText primary='VAT Return' /></ListItemButton></ListItem>
         <ListItem disablePadding><ListItemButton component={RouteLink} to='/tax/details'><ListItemText primary='Corporate Tax' /></ListItemButton></ListItem>
-        <ListItem disablePadding><ListItemButton component={RouteLink} to='/vat/history'><ListItemText primary='Filing History' /></ListItemButton></ListItem>
+        <ListItem disablePadding><ListItemButton component={RouteLink} to='/history'><ListItemText primary='Filing History' /></ListItemButton></ListItem>
         <ListItem disablePadding><ListItemButton component={RouteLink} to='/login'><ListItemText primary='Login' /></ListItemButton></ListItem>
       </List>
       <Button component={RouteLink} to={startedLink} fullWidth variant='contained' sx={{ mt: 2, bgcolor: STYLE.colorPrimary, textTransform: 'none', fontWeight: 700 }}>
@@ -120,7 +120,7 @@ export function PublicLandingPage() {
             <Stack direction='row' spacing={3} alignItems='center' sx={{ display: { xs: 'none', md: 'flex' } }}>
               <Box component={RouteLink} to='/vat/details' sx={{ color: STYLE.colorNavy, textDecoration: 'none', fontWeight: 700 }}>VAT</Box>
               <Box component={RouteLink} to='/tax/details' sx={{ color: STYLE.colorNavy, textDecoration: 'none', fontWeight: 700 }}>Corporate Tax</Box>
-              <Box component={RouteLink} to='/vat/history' sx={{ color: STYLE.colorNavy, textDecoration: 'none', fontWeight: 700 }}>History</Box>
+              <Box component={RouteLink} to='/history' sx={{ color: STYLE.colorNavy, textDecoration: 'none', fontWeight: 700 }}>History</Box>
               <Box component={RouteLink} to='/login' sx={{ color: STYLE.colorNavy, textDecoration: 'none', fontWeight: 700 }}>Login</Box>
               <Button component={RouteLink} to={startedLink} variant='contained' sx={{ bgcolor: STYLE.colorNavy, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: STYLE.colorPrimary } }}>Get Started</Button>
             </Stack>
@@ -160,7 +160,7 @@ export function PublicLandingPage() {
                   <Button component={RouteLink} to='/tax/details' variant='outlined' sx={{ py: 1.4, px: 3.4, textTransform: 'none', fontWeight: 700, borderColor: STYLE.colorNavy, color: STYLE.colorNavy }}>
                     Corporate Tax Calculator
                   </Button>
-                  <Button component={RouteLink} to='/vat/history' variant='text' endIcon={<ArrowRight size={15} />} sx={{ textTransform: 'none', fontWeight: 700, color: STYLE.colorNavy }}>
+                  <Button component={RouteLink} to='/history' variant='text' endIcon={<ArrowRight size={15} />} sx={{ textTransform: 'none', fontWeight: 700, color: STYLE.colorNavy }}>
                     View Filing History
                   </Button>
                 </Stack>

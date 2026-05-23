@@ -16,8 +16,7 @@ import { calculateCorporateTax } from '../features/tax/lib/corporateTaxCalculato
 const DashboardPage = React.lazy(() => import('../pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const ProfilePage = React.lazy(() => import('../pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const BusinessProfilePage = React.lazy(() => import('../pages/BusinessProfilePage').then((m) => ({ default: m.BusinessProfilePage })));
-const VatHistoryPage = React.lazy(() => import('../pages/VatHistoryPage').then((m) => ({ default: m.VatHistoryPage })));
-const CorporateTaxHistoryPage = React.lazy(() => import('../pages/CorporateTaxHistoryPage').then((m) => ({ default: m.CorporateTaxHistoryPage })));
+const HistoryHubPage = React.lazy(() => import('../features/history/HistoryHubPage').then((m) => ({ default: m.HistoryHubPage })));
 const VatHistoryDetailPage = React.lazy(() => import('../pages/VatHistoryDetailPage').then((m) => ({ default: m.VatHistoryDetailPage })));
 const CorporateTaxHistoryDetailPage = React.lazy(() => import('../pages/CorporateTaxHistoryDetailPage').then((m) => ({ default: m.CorporateTaxHistoryDetailPage })));
 const RemindersPage = React.lazy(() => import('../pages/RemindersPage').then((m) => ({ default: m.RemindersPage })));
@@ -176,8 +175,8 @@ function RoutedModules() {
     '/tax': '/tax/details',
     '/dashboard/profile': '/profile',
     '/dashboard/business-profile': '/business-profile',
-    '/dashboard/vat-history': '/vat/history',
-    '/dashboard/tax-history': '/tax/history',
+    '/dashboard/vat-history': '/history?tab=vat',
+    '/dashboard/tax-history': '/history?tab=tax',
     '/dashboard/reminders': '/reminders',
     '/vat/business-details': '/vat/details',
     '/tax/business-details': '/tax/details',
@@ -241,9 +240,14 @@ function RoutedModules() {
   if (pathname === '/dashboard') return <Guarded><LazyPage><DashboardPage /></LazyPage></Guarded>;
   if (pathname === '/profile') return <Guarded><LazyPage><ProfilePage /></LazyPage></Guarded>;
   if (pathname === '/business-profile') return <Guarded><LazyPage><BusinessProfilePage /></LazyPage></Guarded>;
+  if (pathname === '/history') {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const initialTab = tab === 'tax' ? 'tax' : 'vat';
+    return <Guarded><LazyPage><HistoryHubPage initialTab={initialTab} /></LazyPage></Guarded>;
+  }
 
-  if (pathname === '/vat/history') return <Guarded><LazyPage><VatHistoryPage /></LazyPage></Guarded>;
-  if (pathname === '/tax/history') return <Guarded><LazyPage><CorporateTaxHistoryPage /></LazyPage></Guarded>;
+  if (pathname === '/vat/history') return <Guarded><LazyPage><HistoryHubPage initialTab='vat' /></LazyPage></Guarded>;
+  if (pathname === '/tax/history') return <Guarded><LazyPage><HistoryHubPage initialTab='tax' /></LazyPage></Guarded>;
   if (vatHistoryMatch) return <Guarded><LazyPage><VatHistoryDetailPage id={vatHistoryMatch[1]} /></LazyPage></Guarded>;
   if (taxHistoryMatch) return <Guarded><LazyPage><CorporateTaxHistoryDetailPage id={taxHistoryMatch[1]} /></LazyPage></Guarded>;
 

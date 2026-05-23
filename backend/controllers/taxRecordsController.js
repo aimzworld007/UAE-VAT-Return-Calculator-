@@ -27,6 +27,11 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function sumMonthly(payload, key) {
+  const entries = Array.isArray(payload?.monthlyEntries) ? payload.monthlyEntries : Array.isArray(payload?.monthly) ? payload.monthly : [];
+  return entries.reduce((sum, row) => sum + toNumber(row?.[key]), 0);
+}
+
 export async function createTaxRecord(req, res) {
   const parsed = createRecordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ success: false, code: 'VALIDATION_ERROR', message: 'Invalid payload' });
@@ -47,6 +52,26 @@ export async function createTaxRecord(req, res) {
   );
 
   if (taxType === 'VAT') {
+    const salesTotal = toNumber(
+      resultPayload?.totalSales ??
+        resultPayload?.salesBreakdown?.total ??
+        resultPayload?.salesBreakdown?.net ??
+        inputPayload?.standardRatedSales ??
+        sumMonthly(inputPayload, 'sales')
+    );
+    const purchasesTotal = toNumber(
+      resultPayload?.totalPurchases ??
+        inputPayload?.standardRatedPurchases ??
+        sumMonthly(inputPayload, 'purchases')
+    );
+    const expensesTotal = toNumber(
+      resultPayload?.totalExpenses ??
+        resultPayload?.expenses ??
+        inputPayload?.directExpenses ??
+        sumMonthly(inputPayload, 'expenses')
+    );
+    const taxableSales = toNumber(resultPayload?.salesBreakdown?.net ?? salesTotal);
+    const taxablePurchases = toNumber(resultPayload?.taxableInputTotal ?? purchasesTotal);
     const netVat = toNumber(resultPayload?.netVat ?? inputPayload?.netVat);
     const payableVat = netVat > 0 ? netVat : 0;
     const refundableVat = netVat < 0 ? Math.abs(netVat) : 0;
@@ -61,7 +86,7 @@ export async function createTaxRecord(req, res) {
         $1,$2,$3,$4,$5,$6,
         $5,$6,$7,$8,$9,$10,
         $11,$12,$13,$14,$13,$14,$15,
-        $7,$9,$11,$7,$16,NOW()
+        $17,$18,$19,$7,$16,NOW()
       )`,
       [
         req.user.id,
@@ -70,16 +95,19 @@ export async function createTaxRecord(req, res) {
         inputPayload?.periodLabel || periodType || null,
         periodStart ? new Date(periodStart) : null,
         periodEnd ? new Date(periodEnd) : null,
-        toNumber(resultPayload?.salesBreakdown?.net ?? inputPayload?.standardRatedSales),
+        taxableSales,
         toNumber(resultPayload?.outputVat),
-        toNumber(inputPayload?.standardRatedPurchases),
+        taxablePurchases,
         toNumber(resultPayload?.inputVat ?? inputPayload?.recoverableInputVat),
-        toNumber(resultPayload?.expenses ?? inputPayload?.directExpenses),
+        expensesTotal,
         toNumber(resultPayload?.adjustments ?? inputPayload?.previousAdjustment),
         payableVat,
         refundableVat,
         status,
         inputPayload,
+        salesTotal,
+        purchasesTotal,
+        expensesTotal,
       ]
     );
   } else {

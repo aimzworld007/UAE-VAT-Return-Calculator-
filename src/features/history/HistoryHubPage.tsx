@@ -11,7 +11,12 @@ import { downloadVatHistoryPdf } from '../tax/services/vatPdfApi';
 import { downloadCorporateTaxHistoryPdf } from '../tax/services/corporateTaxPdfApi';
 
 export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
-  const [tab, setTab] = React.useState<'vat' | 'tax'>(initialTab);
+  const [tab, setTab] = React.useState<'vat' | 'tax'>(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get('tab');
+    if (fromQuery === 'tax') return 'tax';
+    if (fromQuery === 'vat') return 'vat';
+    return initialTab;
+  });
   const [records, setRecords] = React.useState<any[]>([]);
   const [query, setQuery] = React.useState('');
   const [status, setStatus] = React.useState('');
@@ -45,6 +50,11 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
 
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => { setPage(1); }, [tab, query, status, startDate, endDate]);
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', tab);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  }, [tab]);
 
   const filtered = records;
 
@@ -97,6 +107,12 @@ export function HistoryHubPage({ initialTab }: { initialTab: 'vat' | 'tax' }) {
   return (
     <DashboardLayout>
       <Stack spacing={2.2}>
+        <Box>
+          <Typography variant='h4' sx={{ fontWeight: 700 }}>
+            History
+          </Typography>
+          <Typography color='text.secondary'>Unified history with VAT and Corporate Tax sub-tabs.</Typography>
+        </Box>
         <HistoryTabs value={tab} onChange={setTab} />
         <HistoryFilters
           query={query}
