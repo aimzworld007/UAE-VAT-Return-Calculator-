@@ -28,6 +28,7 @@ import { Vat201Report } from './components/Vat201Report.jsx';
 import { MONTHS, formatVatPeriodLabel, getPeriodFromSelection } from './lib/vatPeriod';
 import { VAT_PRICING_MODES, splitVatFromAmount } from './lib/vatPricing';
 import { downloadPdf, generateVatPdfBlob } from './services/vatPdfApi';
+import { downloadPdfReport } from './lib/pdfGenerator';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import { createBusinessProfile, listBusinessProfiles, updateBusinessProfile } from '../business/services/businessProfileApi';
 
@@ -270,6 +271,13 @@ export function VatWizard({ data, setData, onSave, onReset, onProgressChange, fo
   const handleDownloadPdf = async () => {
     setDownloadLoading(true);
     try {
+      await downloadPdfReport({
+        reportId: 'vat201-report',
+        reportType: 'vat',
+        businessName: data.businessName,
+        taxPeriod: formatVatPeriodLabel(data),
+      });
+    } catch (error) {
       const blob = await generateVatPdfBlob(getVatPdfPayload());
       downloadPdf(blob, buildVatPdfFileName());
     } finally {

@@ -1,6 +1,7 @@
 import React from 'react';
 
-export const FTA_LOGO_URL = 'https://tax.gov.ae/datafolder//Images/TAX/FTA.jpg';
+export const FTA_LOGO_SOURCE_URL = 'https://tax.gov.ae/datafolder//Images/TAX/FTA.jpg';
+export const FTA_LOGO_URL = '/api/assets/fta-logo';
 
 export const formatAED = (value: number | string) => new Intl.NumberFormat('en-AE', {
   style: 'currency', currency: 'AED', minimumFractionDigits: 2, maximumFractionDigits: 2
@@ -13,11 +14,27 @@ export function ReportShell({ id, className = '', children }: { id: string, clas
 export function ReportHeader({ title, subtitle, info = [] }: { title: string, subtitle: string, info?: Array<{ label: string, value: React.ReactNode }> }) {
   return <header className='tax-report-header'>
     <div className='tax-report-brand'>
-      <img src={FTA_LOGO_URL} alt='Federal Tax Authority logo' className='tax-report-logo' crossOrigin='anonymous' referrerPolicy='no-referrer' />
+      <FtaLogo />
       <div><h1>{title}</h1><p>{subtitle}</p></div>
     </div>
     <div className='tax-report-meta'>{info.map((item) => <InfoLine key={item.label} label={item.label} value={item.value} />)}</div>
   </header>;
+}
+
+export function FtaLogo() {
+  const [src, setSrc] = React.useState(FTA_LOGO_URL);
+
+  return (
+    <img
+      src={src}
+      alt='Federal Tax Authority logo'
+      className='tax-report-logo'
+      crossOrigin='anonymous'
+      onError={() => {
+        if (src !== FTA_LOGO_SOURCE_URL) setSrc(FTA_LOGO_SOURCE_URL);
+      }}
+    />
+  );
 }
 
 export function ReportFooter() {

@@ -33,6 +33,7 @@ import { ExportActions, money } from './components/common.jsx';
 import { CorporateTaxReport } from './components/CorporateTaxReport';
 import { calculateCorporateTax } from './lib/corporateTaxCalculator';
 import { downloadCorporateTaxPdf } from './services/corporateTaxPdfApi';
+import { downloadPdfReport } from './lib/pdfGenerator';
 import { createBusinessProfile, listBusinessProfiles, updateBusinessProfile } from '../business/services/businessProfileApi';
 
 const steps = [
@@ -410,21 +411,30 @@ export function CorporateTaxWizard({ data, setData, onSave, onReset, onProgressC
                 try {
                   setDownloadError('');
                   setDownloadLoading(true);
-                  await downloadCorporateTaxPdf({
+                  await downloadPdfReport({
+                    reportId: 'corporate-tax-report',
+                    reportType: 'corporate-tax',
                     companyName: data.companyName,
-                    trn: data.taxRegistrationNumber,
-                    businessActivity: data.businessActivity,
-                    taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart} to ${data.financialYearEnd}` : 'Saved Period',
-                    summary: {
-                      revenue: result.totalRevenue,
-                      expenses: result.totalExpenses,
-                      taxableProfit: result.taxableIncome,
-                      taxAmount: result.taxPayable,
-                    },
+                    taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart}_to_${data.financialYearEnd}` : 'period',
                   });
                 } catch (error) {
-                  console.error('Corporate tax PDF generation failed', error);
-                  setDownloadError('Unable to download Corporate Tax PDF right now. Please try again or use Print.');
+                  try {
+                    await downloadCorporateTaxPdf({
+                      companyName: data.companyName,
+                      trn: data.taxRegistrationNumber,
+                      businessActivity: data.businessActivity,
+                      taxPeriod: data.financialYearStart && data.financialYearEnd ? `${data.financialYearStart} to ${data.financialYearEnd}` : 'Saved Period',
+                      summary: {
+                        revenue: result.totalRevenue,
+                        expenses: result.totalExpenses,
+                        taxableProfit: result.taxableIncome,
+                        taxAmount: result.taxPayable,
+                      },
+                    });
+                  } catch (fallbackError) {
+                    console.error('Corporate tax PDF generation failed', fallbackError);
+                    setDownloadError('Unable to download Corporate Tax PDF right now. Please try again or use Print.');
+                  }
                 } finally {
                   setDownloadLoading(false);
                 }

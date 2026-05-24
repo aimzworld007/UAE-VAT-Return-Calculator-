@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import { formatCurrency, sanitizeNumber, sanitizeText } from '../utils/formatCurrency.js';
+import { getFtaLogoImage } from './ftaLogoService.js';
 
 const VAT201_NON_EMIRATE_ROWS = [
   ['2', 'Tax refunds provided to tourists'], ['3', 'Supplies subject to reverse charge provisions'],
@@ -35,12 +36,16 @@ export function buildVatPdfPayload(body) {
   };
 }
 
-export function generateVatPdf(payload, out) {
+export async function generateVatPdf(payload, out) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   doc.pipe(out);
-  const logoPath = path.resolve('backend/assets/fta-logo.jpg');
-  if (fs.existsSync(logoPath)) doc.image(logoPath, 48, 40, { fit: [130, 50] });
-  else doc.fontSize(10).fillColor('#374151').text('UAE Federal Tax Authority', 48, 48);
+  const logo = await getFtaLogoImage();
+  if (logo?.buffer) doc.image(logo.buffer, 48, 40, { fit: [130, 50] });
+  else {
+    const logoPath = path.resolve('backend/assets/fta-logo.jpg');
+    if (fs.existsSync(logoPath)) doc.image(logoPath, 48, 40, { fit: [130, 50] });
+    else doc.fontSize(10).fillColor('#374151').text('UAE Federal Tax Authority', 48, 48);
+  }
 
   doc.fontSize(20).fillColor('#0f172a').text('UAE VAT201 Return Summary', 48, 100);
   doc.fontSize(10).fillColor('#475569').text('Prepared from UAE VAT Return Calculator Pro', 48, 124);

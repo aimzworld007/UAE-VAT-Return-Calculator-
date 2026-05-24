@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { formatCurrency, sanitizeNumber, sanitizeText } from '../utils/formatCurrency.js';
+import { getFtaLogoImage } from './ftaLogoService.js';
 
 export function buildCorporateTaxPdfPayload(body = {}) {
   const summary = body.summary || {};
@@ -19,11 +20,15 @@ export function buildCorporateTaxPdfPayload(body = {}) {
   };
 }
 
-export function generateCorporateTaxPdf(payload, out) {
+export async function generateCorporateTaxPdf(payload, out) {
   const doc = new PDFDocument({ size: 'A4', margin: 48 });
   doc.pipe(out);
 
   doc.roundedRect(48, 44, 499, 86, 10).fillAndStroke('#f8fbff', '#dbeafe');
+  const logo = await getFtaLogoImage();
+  if (logo?.buffer) {
+    doc.image(logo.buffer, 50, 50, { fit: [116, 44] });
+  }
   doc.fontSize(20).fillColor('#0f172a').text('UAE Corporate Tax Report', 62, 62);
   doc.fontSize(10).fillColor('#475569').text('Prepared from UAE VAT & Corporate Tax System', 62, 88);
   doc.fontSize(10).fillColor('#0f172a').text(`Prepared Date: ${payload.preparedDate}`, 370, 64, { width: 165, align: 'right' });

@@ -177,6 +177,7 @@ function RoutedModules() {
     '/dashboard/business-profile': '/business-profile',
     '/dashboard/vat-history': '/history?tab=vat',
     '/dashboard/tax-history': '/history?tab=tax',
+    '/dashboard/history': '/history',
     '/dashboard/reminders': '/reminders',
     '/vat/business-details': '/vat/details',
     '/tax/business-details': '/tax/details',
