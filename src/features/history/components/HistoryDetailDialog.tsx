@@ -38,6 +38,9 @@ function isVatRecord(record: any) {
 }
 
 function rowsForRecord(record: any) {
+  if (!record || typeof record !== 'object') {
+    return [];
+  }
   const payload = payloadOf(record);
   if (isVatRecord(record)) {
     const sales = toNumber(record.sales_total ?? record.taxable_sales ?? record.taxableSales ?? payload.totalSales ?? payload.standardRatedSales ?? sumMonthly(record, 'sales'));
@@ -92,12 +95,16 @@ export function HistoryDetailDialog({ open, onClose, record }: { open: boolean; 
           <TableContainer sx={{ border: '1px solid #e2e8f0', borderRadius: 2 }}>
             <Table size='small'>
               <TableBody>
-                {detailRows.map(([label, value]) => (
+                {detailRows.length ? detailRows.map(([label, value]) => (
                   <TableRow key={label}>
                     <TableCell sx={{ width: 200, fontWeight: 700 }}>{label}</TableCell>
                     <TableCell>{value}</TableCell>
                   </TableRow>
-                ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={2}>No history record selected.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
